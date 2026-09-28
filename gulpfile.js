@@ -14,6 +14,7 @@ gulp.task("copy", function () {
                 "!" + SRC + "/**/*.ts",
                 "!" + SRC + "/**/*.tsx",
                 "!" + SRC + "/**/*.less",
+                "!" + SRC + "/cli/test/**",
                 "!" + SRC + "/tsconfig.json",
                 "!" + SRC + "/tsconfig.dev.json"
             ],

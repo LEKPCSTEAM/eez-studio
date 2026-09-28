@@ -646,7 +646,16 @@ export class ProjectEditorTab implements IHomeTab {
             projectStore.findProjectComponent();
         };
 
-        const onReloadProject = () => {
+        const onReloadProject = (event: any, filePath?: string) => {
+            if (
+                filePath &&
+                this.filePath &&
+                path.resolve(filePath).toLowerCase() !=
+                    path.resolve(this.filePath).toLowerCase()
+            ) {
+                // reload request is for some other project
+                return;
+            }
             this.reloadProject();
         };
 

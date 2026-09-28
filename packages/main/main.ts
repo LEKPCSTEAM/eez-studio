@@ -15,6 +15,18 @@ import type * as HomeWindowModule from "main/home-window";
 import { unloadVisa } from "instrument/connection/interfaces/visa-dll";
 import { setup } from "main/setup";
 import { HOME_WINDOW_URL } from "main/home-window";
+import {
+    isCliMode,
+    redirectConsoleToStderr,
+    runCliMain,
+    useTemporarySessionData
+} from "main/cli-main";
+
+const cliMode = isCliMode();
+if (cliMode) {
+    redirectConsoleToStderr();
+    useTemporarySessionData();
+}
 
 // disable security warnings inside dev console
 process.env["ELECTRON_DISABLE_SECURITY_WARNINGS"] = true as any;
@@ -36,6 +48,11 @@ app.commandLine.appendSwitch("disable-renderer-backgrounding");
 let homeWindow: BrowserWindow;
 
 app.on("ready", async function () {
+    if (cliMode) {
+        await runCliMain(HOME_WINDOW_URL);
+        return;
+    }
+
     let buildProjectFilePath;
     const buildProjectArgIndex = process.argv.indexOf("--build-project");
     if (buildProjectArgIndex != -1) {
@@ -50,15 +67,22 @@ app.on("ready", async function () {
             app.quit();
             return;
         }
+
+        if (process.argv.includes("--reload-project")) {
+            // no running instance to reload
+            app.quit();
+            return;
+        }
     }
 
     app.on("second-instance", function (event, commandLine, workingDirectory) {
-        if (commandLine.includes("--reload-project")) {
+        const reloadProjectArgIndex = commandLine.indexOf("--reload-project");
+        if (reloadProjectArgIndex != -1) {
             console.log("[reload-project] second-instance triggered, commandLine:", commandLine);
             const { reloadProject } =
                 require("main/home-window") as typeof HomeWindowModule;
             console.log("[reload-project] calling reloadProject()");
-            reloadProject();
+            reloadProject(commandLine[reloadProjectArgIndex + 1]);
             return;
         }
         console.log("[second-instance] commandLine:", commandLine);
@@ -128,6 +152,9 @@ app.on("will-finish-launching", async function () {
 });
 
 ipcMain.once("open-command-line-project", async function () {
+    if (cliMode) {
+        return;
+    }
     const buildProjectArgIndex = process.argv.indexOf("--build-project");
     if (buildProjectArgIndex == -1) {
         const filePath = process.argv[process.argv.length - 1];
@@ -147,6 +174,10 @@ ipcMain.on("on-build-project-message", function (event, message) {
     } else {
         app.quit();
     }
+});
+
+ipcMain.on("on-build-project-exit", function (event, exitCode: number) {
+    process.stdout.write("", () => app.exit(exitCode));
 });
 
 let powerSaveBlockerId: number | undefined = undefined;

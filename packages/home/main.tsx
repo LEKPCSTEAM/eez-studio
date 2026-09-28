@@ -162,6 +162,7 @@ const Main = observer(
 async function main() {
     const params = new URLSearchParams(location.search);
     const buildProject = params.get("build-project") === "1";
+    const cliMode = params.get("cli") === "1";
 
     let nodeModuleFolders: string[];
     try {
@@ -174,6 +175,12 @@ async function main() {
     await loadExtensions(nodeModuleFolders);
 
     extensionsCatalog.load();
+
+    if (cliMode) {
+        const { runCli } = await import("cli/cli-entry");
+        runCli();
+        return;
+    }
 
     if (!buildProject) {
         loadTabs();

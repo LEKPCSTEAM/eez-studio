@@ -2,11 +2,14 @@ import { ipcRenderer } from "electron";
 import { autorun } from "mobx";
 
 import { Message, ProjectStore, Section } from "project-editor/store";
+import { ProjectEditor } from "project-editor/project-editor-interface";
 
 import { initProjectEditor } from "project-editor/project-editor-bootstrap";
 
 export async function buildProject(filePath: string) {
     ipcRenderer.send("on-build-project-message", "Build project: " + filePath);
+
+    let exitCode = 0;
 
     try {
         initProjectEditor(undefined, undefined as any);
@@ -42,13 +45,26 @@ export async function buildProject(filePath: string) {
             dumpMessages(messages.messages, "");
         });
 
-        await projectStore.build();
+        // call the build directly: ProjectStore.build() needs the editor UI
+        if (projectStore.projectTypeTraits.isIEXT) {
+            await ProjectEditor.build.buildExtensions(projectStore);
+        } else {
+            await ProjectEditor.build.buildProject(projectStore, "buildFiles");
+        }
+
+        if (
+            projectStore.outputSectionsStore.getSection(Section.OUTPUT)
+                .numErrors > 0
+        ) {
+            exitCode = 1;
+        }
     } catch (err: any) {
         ipcRenderer.send(
             "on-build-project-message",
             "Unhandled error: " + err.toString()
         );
+        exitCode = 1;
     }
 
-    ipcRenderer.send("on-build-project-message", undefined);
+    ipcRenderer.send("on-build-project-exit", exitCode);
 }
