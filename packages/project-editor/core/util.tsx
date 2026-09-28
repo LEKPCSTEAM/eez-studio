@@ -57,6 +57,11 @@ export function showGenericDialog(
         opts?: IDialogOptions;
         modal?: true;
         backdrop?: "static";
+        onFieldChange?: (
+            name: string,
+            value: any,
+            fieldValues: { [fieldName: string]: any }
+        ) => void;
     }
 ) {
     return new Promise<GenericDialogResult>((resolve, reject) => {
@@ -87,6 +92,7 @@ export function showGenericDialog(
                     }}
                     modal={conf.modal}
                     backdrop={conf.backdrop}
+                    onFieldChange={conf.onFieldChange}
                 />
             </ProjectContext.Provider>,
             conf.opts
