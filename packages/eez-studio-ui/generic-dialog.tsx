@@ -74,6 +74,8 @@ export interface IFieldProperties {
     formText?: string;
     checkboxStyleSwitch?: boolean;
     inputGroupButton?: React.ReactNode;
+    // called after field value is changed, fieldValues can be modified to update other fields
+    onChange?: (value: any, fieldValues: any) => void;
 }
 
 export interface IFieldComponentProps {
@@ -327,6 +329,10 @@ export const GenericDialog = observer(
 
         onChange = (fieldProperties: any, value: any) => {
             this.fieldValues[fieldProperties.name] = value;
+
+            if (fieldProperties.onChange) {
+                fieldProperties.onChange(value, this.fieldValues);
+            }
 
             if (this.errorMessages) {
                 // revalidate

@@ -58,6 +58,14 @@ import { IFieldProperties } from "eez-studio-types";
 import type { ProjectEditorFeature } from "project-editor/store/features";
 import { getLvglBitmapColorFormats } from "project-editor/lvgl/lvgl-versions";
 import { CF_TRUE_COLOR_ALPHA } from "project-editor/lvgl/lvgl-constants";
+import { ImageEditorResult, showImageEditor } from "./ImageEditor";
+import {
+    isSvgFilePath,
+    loadSvgFile,
+    parseSvg,
+    renderSvg,
+    SvgSource
+} from "./svg";
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -93,15 +101,29 @@ const ExportBitmapFilePropertyGridUI = observer(
             }
         };
 
+        edit = () => {
+            editBitmapImage(this.props.objects[0] as Bitmap);
+        };
+
         render() {
             if (this.props.objects.length > 1) {
                 return null;
             }
+            const bitmap = this.props.objects[0] as Bitmap;
             return (
-                <div style={{ marginTop: 10 }}>
-                    <Button color="primary" size="small" onClick={this.export}>
-                        Export Bitmap File
+                <div style={{ marginTop: 10, display: "flex", gap: 10 }}>
+                    <Button color="primary" size="small" onClick={this.edit}>
+                        Edit Image
                     </Button>
+                    {bitmap.image.startsWith("data:image/") && (
+                        <Button
+                            color="primary"
+                            size="small"
+                            onClick={this.export}
+                        >
+                            Export Bitmap File
+                        </Button>
+                    )}
                 </div>
             );
         }
@@ -257,9 +279,7 @@ export class Bitmap extends EezObject {
                 propertyGridRowComponent: ExportBitmapFilePropertyGridUI,
                 skipSearch: true,
                 hideInPropertyGrid: (bitmap: Bitmap) =>
-                    bitmap.image &&
-                    typeof bitmap.image == "string" &&
-                    bitmap.image.startsWith("data:image/")
+                    bitmap.image && typeof bitmap.image == "string"
                         ? false
                         : true
             }
@@ -297,6 +317,11 @@ export class Bitmap extends EezObject {
         newItem: async (parent: IEezObject) => {
             const projectStore = getProjectStore(parent);
 
+            // name that was set automatically from the selected file,
+            // it is replaced when another file is selected
+            // unless the user typed a different name in the meantime
+            let autoName: string | undefined;
+
             const result = await showGenericDialog(projectStore, {
                 dialogDefinition: {
                     title: "New Bitmap",
@@ -321,15 +346,38 @@ export class Bitmap extends EezObject {
                             displayName: "Image",
                             type: MultipleAbsoluteFileInput,
                             validators: [validators.required],
+                            onChange: (filePaths: string[], values: any) => {
+                                if (
+                                    !filePaths ||
+                                    filePaths.length != 1 ||
+                                    (values.name && values.name != autoName)
+                                ) {
+                                    return;
+                                }
+                                autoName = getUniquePropertyValue(
+                                    projectStore.project.bitmaps,
+                                    "name",
+                                    // "." is not allowed in bitmap name
+                                    path
+                                        .parse(filePaths[0])
+                                        .name.replace(/\./g, "_")
+                                ) as string;
+                                values.name = autoName;
+                            },
                             options: {
                                 filters: [
                                     {
                                         name: "Image files",
-                                        extensions: ["png", "jpg", "jpeg"]
+                                        extensions: ["png", "jpg", "jpeg", "svg"]
                                     },
                                     { name: "All Files", extensions: ["*"] }
                                 ]
                             }
+                        },
+                        {
+                            name: "editImage",
+                            displayName: "Resize / edit image before import",
+                            type: "boolean"
                         },
                         ...(projectStore.projectTypeTraits.isLVGL
                             ? [
@@ -356,13 +404,15 @@ export class Bitmap extends EezObject {
                 values: {
                     bpp: projectStore.projectTypeTraits.isLVGL
                         ? CF_TRUE_COLOR_ALPHA
-                        : 32
+                        : 32,
+                    editImage: false
                 },
                 modal: true,
                 backdrop: "static"
             });
 
             const bpp: number = result.values.bpp;
+            const editImage: boolean = result.values.editImage;
 
             if (result.values.imageFilePaths.length == 1) {
                 const name: string = result.values.name;
@@ -372,7 +422,8 @@ export class Bitmap extends EezObject {
                     result.values.imageFilePaths[0],
                     undefined,
                     name,
-                    bpp
+                    bpp,
+                    editImage
                 );
             } else {
                 projectStore.undoManager.setCombineCommands(true);
@@ -391,7 +442,8 @@ export class Bitmap extends EezObject {
                         filePath,
                         undefined,
                         name,
-                        bpp
+                        bpp,
+                        editImage
                     );
                     if (bitmap) {
                         projectStore.addObject(parent, bitmap);
@@ -654,12 +706,145 @@ export class Bitmap extends EezObject {
 
 registerClass("Bitmap", Bitmap);
 
+function getImageEditorOptions(projectStore: ProjectStore) {
+    if (projectStore.projectTypeTraits.isDashboard) {
+        return {};
+    }
+    const general = projectStore.project.settings.general;
+    return {
+        displayWidth: general.displayWidth,
+        displayHeight: general.displayHeight
+    };
+}
+
+// Returns the absolute path of the saved file or undefined if canceled.
+async function saveEditedImageFile(
+    dataURL: string,
+    defaultPath: string,
+    forbiddenPath?: string
+) {
+    const result = await dialog.showSaveDialog(getCurrentWindow(), {
+        title: "Save Edited Image",
+        filters: [
+            { name: "PNG Image", extensions: ["png"] },
+            { name: "All Files", extensions: ["*"] }
+        ],
+        defaultPath
+    });
+
+    const filePath = result.filePath;
+    if (!filePath) {
+        return undefined;
+    }
+
+    // Overwriting the file currently used by the bitmap is not allowed
+    // because the already loaded image would not be refreshed.
+    if (
+        forbiddenPath &&
+        path.resolve(filePath).toLowerCase() ==
+            path.resolve(forbiddenPath).toLowerCase()
+    ) {
+        notification.error(
+            "Edited image must be saved under a different file name than the one currently used by the bitmap."
+        );
+        return undefined;
+    }
+
+    await fs.promises.writeFile(
+        filePath,
+        Buffer.from(dataURL.substring(dataURL.indexOf(",") + 1), "base64")
+    );
+
+    return filePath;
+}
+
+function getEditedImageDefaultPath(
+    sourceFilePath: string,
+    width: number,
+    height: number
+) {
+    const { dir, name } = path.parse(sourceFilePath);
+    return path.join(dir, `${name}_${width}x${height}.png`);
+}
+
+// SVG is rendered at its intrinsic size, areas without content stay transparent
+async function svgToPng(source: SvgSource): Promise<ImageEditorResult> {
+    const canvas = await renderSvg(source);
+    return {
+        modified: true,
+        dataURL: canvas.toDataURL("image/png"),
+        width: canvas.width,
+        height: canvas.height
+    };
+}
+
+// Returns value for the Bitmap.image property or undefined if canceled.
+async function storeImageEditorResult(
+    projectStore: ProjectStore,
+    result: ImageEditorResult,
+    sourceFilePath: string
+) {
+    if (projectStore.project.settings.general.embedBitmaps) {
+        return result.dataURL;
+    }
+
+    const savedFilePath = await saveEditedImageFile(
+        result.dataURL,
+        getEditedImageDefaultPath(sourceFilePath, result.width, result.height)
+    );
+    if (!savedFilePath) {
+        return undefined;
+    }
+    return projectStore.getFilePathRelativeToProjectPath(savedFilePath);
+}
+
+export async function editBitmapImage(bitmap: Bitmap) {
+    const projectStore = getProjectStore(bitmap);
+
+    try {
+        const result = await showImageEditor({
+            title: `Edit Image: ${bitmap.name}`,
+            imageSrc: bitmap.imageSrc,
+            ...getImageEditorOptions(projectStore)
+        });
+
+        if (!result || !result.modified) {
+            return;
+        }
+
+        let image;
+        if (bitmap.image.startsWith("data:image/")) {
+            image = result.dataURL;
+        } else {
+            const currentFilePath = bitmap.imageSrc;
+            const filePath = await saveEditedImageFile(
+                result.dataURL,
+                getEditedImageDefaultPath(
+                    currentFilePath,
+                    result.width,
+                    result.height
+                ),
+                currentFilePath
+            );
+            if (!filePath) {
+                return;
+            }
+            image = projectStore.getFilePathRelativeToProjectPath(filePath);
+        }
+
+        projectStore.updateObject(bitmap, { image });
+    } catch (err: any) {
+        notification.error(err.toString());
+    }
+}
+
 export async function createBitmap(
     projectStore: ProjectStore,
     filePath: string,
     fileType?: string,
     name?: string,
-    bpp?: number
+    bpp?: number,
+    editImage?: boolean
 ) {
     if (bpp == undefined) {
         bpp = projectStore.projectTypeTraits.isLVGL ? CF_TRUE_COLOR_ALPHA : 32;
@@ -676,7 +861,37 @@ export async function createBitmap(
     try {
         let image;
 
-        if (projectStore.project.settings.general.embedBitmaps) {
+        let result: ImageEditorResult | undefined;
+
+        if (editImage) {
+            result = await showImageEditor({
+                title: `Import Image: ${path.basename(filePath)}`,
+                imageSrc: filePath,
+                ...getImageEditorOptions(projectStore)
+            });
+
+            if (!result) {
+                // canceled
+                return undefined;
+            }
+        } else if (isSvgFilePath(filePath)) {
+            result = await svgToPng(await loadSvgFile(filePath));
+        }
+
+        if (result && result.modified) {
+            image = await storeImageEditorResult(
+                projectStore,
+                result,
+                filePath
+            );
+            if (!image) {
+                return undefined;
+            }
+        }
+
+        if (image) {
+            // already set by the image editor
+        } else if (projectStore.project.settings.general.embedBitmaps) {
             const result = fs.readFileSync(filePath, "base64");
             if (fileType == undefined) {
                 const ext = path.extname(filePath).toLowerCase();
@@ -728,7 +943,16 @@ export async function createBitmapFromFile(
 
         let image;
 
-        if (projectStore.project.settings.general.embedBitmaps) {
+        if (file.type == "image/svg+xml" || isSvgFilePath(file.name)) {
+            image = await storeImageEditorResult(
+                projectStore,
+                await svgToPng(parseSvg(await file.text())),
+                filePath || file.name
+            );
+            if (!image) {
+                return undefined;
+            }
+        } else if (projectStore.project.settings.general.embedBitmaps) {
             let fileType = file.type;
             if (file.type == undefined) {
                 const ext = path.extname(file.name).toLowerCase();
