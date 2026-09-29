@@ -20,12 +20,12 @@ export function bringHomeWindowToFocus() {
     }
 }
 
-export function reloadProject() {
+export function reloadProject(filePath?: string) {
     let homeWindow = findWindowByParams(HOME_WINDOW_PARAMS);
     console.log("[reload-project] homeWindow found:", !!homeWindow);
     if (homeWindow) {
         console.log("[reload-project] sending IPC reload-project to renderer");
-        homeWindow.browserWindow.webContents.send("reload-project");
+        homeWindow.browserWindow.webContents.send("reload-project", filePath);
     }
 }
 

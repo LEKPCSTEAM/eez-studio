@@ -42,6 +42,11 @@ async function getExtraResource() {
         ...dockerBuild,
         ...[
             {
+                // CLI launcher outside of app.asar, so "node <resources>/cli/eez-cli.js" works
+                from: "./packages/cli/launcher/eez-cli.js",
+                to: "cli/eez-cli.js"
+            },
+            {
                 from: "./LICENSE.TXT",
                 to: "."
             },
