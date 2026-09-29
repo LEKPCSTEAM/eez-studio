@@ -153,7 +153,8 @@ $EEZ check && $EEZ build
 ```
 
 Many operations can be applied as one transaction (checked and saved once;
-nothing is saved if one fails):
+nothing is saved if one fails, and asset files copied into the project folder
+are removed again). `project new` can't be part of a transaction:
 
 ```bash
 $EEZ apply changes.txt        # one command per line

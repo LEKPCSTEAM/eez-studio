@@ -146,6 +146,59 @@ test("apply is a transaction", () => {
     assert.equal(fs.readFileSync(file, "utf8"), before);
 });
 
+test("project new --dry-run writes nothing, also with --force", () => {
+    const dir = path.join(tmp, "dry-new");
+    let r = cli(["project", "new", path.join(dir, "new.eez-project"), "--dry-run", "--json"]);
+    assert.equal(r.code, 0, r.stderr);
+    const json = r.json();
+    assert.equal(json.dryRun, true);
+    assert.equal(json.saved, false);
+    assert.equal(fs.existsSync(dir), false);
+
+    const file = copyFixture("dry-force.eez-project");
+    const before = fs.readFileSync(file, "utf8");
+    r = cli(["project", "new", file, "--force", "--dry-run"]);
+    assert.equal(r.code, 0, r.stderr);
+    assert.equal(fs.readFileSync(file, "utf8"), before);
+});
+
+test("failed apply removes copied assets, project new is not allowed", () => {
+    const dir = path.join(tmp, "tx-assets");
+    fs.mkdirSync(dir);
+    const file = path.join(dir, "tx-assets.eez-project");
+    fs.copyFileSync(fixture, file);
+    const before = fs.readFileSync(file, "utf8");
+    const png = path.join(tmp, "icon.png");
+    fs.writeFileSync(
+        png,
+        Buffer.from(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+            "base64"
+        )
+    );
+
+    let r = cli([
+        "-p",
+        file,
+        "apply",
+        "--ops",
+        JSON.stringify([
+            ["image", "add", png, "--name", "icon"],
+            "widget add NoSuchWidget --page Main"
+        ])
+    ]);
+    assert.equal(r.code, 1);
+    assert.match(r.stderr, /operation 2 failed/);
+    assert.equal(fs.readFileSync(file, "utf8"), before);
+    assert.deepEqual(fs.readdirSync(dir), ["tx-assets.eez-project"]);
+
+    const other = path.join(dir, "other.eez-project");
+    r = cli(["-p", file, "apply", "--ops", JSON.stringify([["project", "new", other]])]);
+    assert.notEqual(r.code, 0);
+    assert.match(r.stderr, /can't be part of a transaction/);
+    assert.equal(fs.existsSync(other), false);
+});
+
 test("references are updated on rename and protected on remove", () => {
     const file = copyFixture("refs.eez-project");
     let r = cli(["-p", file, "apply", "-"], {

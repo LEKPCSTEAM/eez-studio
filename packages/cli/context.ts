@@ -1,3 +1,6 @@
+import fs from "fs";
+import path from "path";
+
 import type { ProjectStore } from "project-editor/store";
 import type { Project } from "project-editor/project/project";
 import type { IEezObject } from "project-editor/core/object";
@@ -19,6 +22,10 @@ export class CommandContext {
     changes: string[] = [];
     // files written by the command (render output, exported assets ...)
     files: string[] = [];
+    // files and folders created in the project folder, removed if the
+    // command (or the "apply" transaction it is part of) fails;
+    // nested commands share the array of their parent
+    createdFiles: string[] = [];
     // extra MCP content (images)
     images: { data: Uint8Array; mimeType: string }[] = [];
     // set when the project was changed outside of the undo manager
@@ -52,6 +59,39 @@ export class CommandContext {
 
     get force() {
         return this.flag("force");
+    }
+
+    // copy a file into the project folder, it is removed again if the
+    // command fails (an existing destination is never overwritten)
+    copyFile(source: string, destination: string) {
+        if (fs.existsSync(destination)) {
+            return;
+        }
+        this.createDirectory(path.dirname(destination));
+        fs.copyFileSync(source, destination);
+        this.createdFiles.push(destination);
+    }
+
+    createDirectory(dir: string) {
+        const missing: string[] = [];
+        for (let d = path.resolve(dir); !fs.existsSync(d); d = path.dirname(d)) {
+            missing.unshift(d);
+        }
+        fs.mkdirSync(dir, { recursive: true });
+        this.createdFiles.push(...missing);
+    }
+
+    // undo copyFile / createDirectory, newest first; folders only if empty
+    rollbackCreatedFiles() {
+        for (const file of this.createdFiles.splice(0).reverse()) {
+            try {
+                if (fs.statSync(file).isDirectory()) {
+                    fs.rmdirSync(file);
+                } else {
+                    fs.rmSync(file);
+                }
+            } catch (err) {}
+        }
     }
 
     usage(message: string): never {

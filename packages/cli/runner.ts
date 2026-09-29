@@ -139,6 +139,12 @@ export class Runner {
         if (command.name == "apply") {
             throw new UsageError("apply can't be nested");
         }
+        if (command.standalone) {
+            throw new UsageError(
+                `"${command.name}" can't be part of a transaction`,
+                "run it as a separate command"
+            );
+        }
         const ctx = new CommandContext(
             command,
             this.session,
@@ -146,6 +152,8 @@ export class Runner {
             args.slice(consumed),
             { ...inheritedOptions(parent.opts), ...opts }
         );
+        // files copied by the nested command are rolled back with the parent
+        ctx.createdFiles = parent.createdFiles;
         await command.run(ctx);
         return ctx;
     }
@@ -250,6 +258,9 @@ export class Runner {
             result.ok = true;
             result.exitCode = EXIT_OK;
         } catch (err) {
+            // remove files copied into the project folder (assets)
+            ctx?.rollbackCreatedFiles();
+
             // discard partial in-memory changes
             if (
                 mutating &&

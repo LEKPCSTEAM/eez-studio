@@ -12,6 +12,9 @@ export interface CommandDef {
     project?: "required" | "none";
     // true if the command can change the project (saved after success)
     mutating?: boolean;
+    // true if the command can't be part of another command's transaction
+    // ("apply"), e.g. it writes a new project file
+    standalone?: boolean;
     // group used by "help"
     group?: string;
     // other names for the same command

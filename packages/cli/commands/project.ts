@@ -1,4 +1,5 @@
 import fs from "fs";
+import os from "os";
 import path from "path";
 
 import { ProjectEditor } from "project-editor/project-editor-interface";
@@ -209,6 +210,23 @@ async function copyResource(source: string, destination: string) {
     }
 }
 
+// Copy the staged new project into its folder. Other files (template fonts
+// ...) are never overwritten, the project file itself is copied by the caller.
+function copyStagedFiles(ctx: CommandContext, stagingDir: string, projectDir: string, skip?: string) {
+    for (const entry of fs.readdirSync(stagingDir, { withFileTypes: true })) {
+        const source = path.join(stagingDir, entry.name);
+        if (source == skip) {
+            continue;
+        }
+        const destination = path.join(projectDir, entry.name);
+        if (entry.isDirectory()) {
+            copyStagedFiles(ctx, source, destination);
+        } else {
+            ctx.copyFile(source, destination);
+        }
+    }
+}
+
 // template widgets are placed for the template's display size (e.g. a
 // "Hello, world!" label in the center of 800x480): keep their centers at the
 // same relative position on the new display
@@ -264,6 +282,8 @@ const newCommand: CommandDef = {
   --force              overwrite an existing file`,
     booleans: ["empty"],
     project: "none",
+    // writes the project file, can't be rolled back by "apply"
+    standalone: true,
     group: "project",
     async run(ctx) {
         let file = ctx.arg(0, "file");
@@ -297,6 +317,7 @@ const newCommand: CommandDef = {
         const size = ctx.pair("size");
 
         let json: any;
+        let resources: { source: string; name: string }[] = [];
         const template = ctx.str("template");
         if (ctx.flag("empty")) {
             json = emptyProject({
@@ -337,50 +358,73 @@ const newCommand: CommandDef = {
 
             // resource files used by the template (fonts ...)
             if (resourceBase && type.files) {
-                for (const resource of type.files) {
-                    await copyResource(resourceBase + resource, path.join(projectDir, resource));
+                resources = type.files.map(name => ({ source: resourceBase + name, name }));
+            }
+        }
+
+        // The project is created in a staging folder and copied to its
+        // destination only when every step succeeded, so nothing is written
+        // with --dry-run or when a step fails.
+        const stagingDir = fs.mkdtempSync(path.join(os.tmpdir(), "eez-cli-new-"));
+        const stagingFilePath = path.join(stagingDir, path.basename(filePath));
+        let general, display, pages, errors;
+        try {
+            for (const resource of resources) {
+                await copyResource(resource.source, path.join(stagingDir, resource.name));
+            }
+            fs.writeFileSync(stagingFilePath, JSON.stringify(json, undefined, 2), "utf8");
+
+            // load it with the project model
+            await ctx.session.open(stagingFilePath);
+
+            // display size (pages and LVGL screens follow)
+            if (size && type.projectType != "dashboard") {
+                const oldWidth = ctx.project.settings.general.displayWidth;
+                const oldHeight = ctx.project.settings.general.displayHeight;
+                const nested = await ctx.runner.executeNested(
+                    ["project", "set", `displayWidth=${size[0]}`, `displayHeight=${size[1]}`],
+                    ctx
+                );
+                ctx.changes.push(...nested.changes);
+                if (oldWidth && oldHeight) {
+                    repositionTemplateWidgets(ctx, size[0] / oldWidth, size[1] / oldHeight);
                 }
             }
-        }
 
-        fs.mkdirSync(projectDir, { recursive: true });
-        fs.writeFileSync(filePath, JSON.stringify(json, undefined, 2), "utf8");
-
-        // load it with the project model
-        await ctx.session.open(filePath);
-        ctx.runner.defaults.project = filePath;
-
-        // display size (pages and LVGL screens follow)
-        if (size && type.projectType != "dashboard") {
-            const oldWidth = ctx.project.settings.general.displayWidth;
-            const oldHeight = ctx.project.settings.general.displayHeight;
-            const nested = await ctx.runner.executeNested(
-                ["project", "set", `displayWidth=${size[0]}`, `displayHeight=${size[1]}`],
-                ctx
-            );
-            ctx.changes.push(...nested.changes);
-            if (oldWidth && oldHeight) {
-                repositionTemplateWidgets(ctx, size[0] / oldWidth, size[1] / oldHeight);
+            // EEZ-GUI styles need a font
+            if (ctx.flag("empty") && (type.projectType == "firmware" || type.projectType == "eez-gui-lite")) {
+                await addDefaultFont(ctx);
             }
+
+            // template names follow the naming convention too (Main -> main_page)
+            fixNaming(ctx);
+
+            await ctx.session.save({ backup: false });
+
+            general = ctx.project.settings.general;
+            display =
+                type.projectType == "dashboard"
+                    ? `${ctx.project.userPages[0]?.width}x${ctx.project.userPages[0]?.height}`
+                    : `${general.displayWidth}x${general.displayHeight}`;
+            pages = ctx.project.userPages.map(page => page.name);
+            errors = ctx.session.check().filter(p => p.type == "error").length;
+
+            ctx.session.close();
+
+            if (!ctx.flag("dry-run")) {
+                ctx.createDirectory(projectDir);
+                copyStagedFiles(ctx, stagingDir, projectDir, stagingFilePath);
+                fs.copyFileSync(stagingFilePath, filePath);
+                await ctx.session.open(filePath);
+                ctx.runner.defaults.project = filePath;
+                ctx.saved = true;
+            }
+        } finally {
+            if (ctx.session.filePath == stagingFilePath) {
+                ctx.session.close();
+            }
+            fs.rmSync(stagingDir, { recursive: true, force: true });
         }
-
-        // EEZ-GUI styles need a font
-        if (ctx.flag("empty") && (type.projectType == "firmware" || type.projectType == "eez-gui-lite")) {
-            await addDefaultFont(ctx);
-        }
-
-        // template names follow the naming convention too (Main -> main_page)
-        fixNaming(ctx);
-
-        await ctx.session.save({ backup: false });
-        ctx.saved = true;
-
-        const general = ctx.project.settings.general;
-        const display =
-            type.projectType == "dashboard"
-                ? `${ctx.project.userPages[0]?.width}x${ctx.project.userPages[0]?.height}`
-                : `${general.displayWidth}x${general.displayHeight}`;
-        const errors = ctx.session.check().filter(p => p.type == "error").length;
 
         ctx.changed(`created ${filePath}`);
         ctx.emit(
@@ -389,12 +433,12 @@ const newCommand: CommandDef = {
                 type: typeName,
                 lvglVersion: type.projectType == "lvgl" ? general.lvglVersion : undefined,
                 display,
-                pages: ctx.project.userPages.map(page => `page:${page.name}`),
+                pages: pages.map(page => `page:${page}`),
                 errors
             },
             `created ${filePath} (${type.description}${
                 type.projectType == "lvgl" ? ", LVGL " + general.lvglVersion : ""
-            }, ${display}, pages: ${ctx.project.userPages.map(page => page.name).join(", ")})`
+            }, ${display}, pages: ${pages.join(", ")})`
         );
     }
 };

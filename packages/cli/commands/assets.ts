@@ -34,12 +34,10 @@ function assetFilePath(ctx: CommandContext, file: string, folder: string) {
         return absolute;
     }
     const destination = path.join(projectDir, folder, path.basename(absolute));
-    if (!ctx.flag("dry-run")) {
-        fs.mkdirSync(path.dirname(destination), { recursive: true });
-        if (!fs.existsSync(destination)) {
-            fs.copyFileSync(absolute, destination);
-            ctx.files.push(destination);
-        }
+    if (!ctx.flag("dry-run") && !fs.existsSync(destination)) {
+        // removed again if the command or its "apply" batch fails
+        ctx.copyFile(absolute, destination);
+        ctx.files.push(destination);
     }
     return fs.existsSync(destination) ? destination : absolute;
 }
