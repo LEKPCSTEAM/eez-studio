@@ -197,6 +197,11 @@ interface GenericDialogProps {
     setOnChangeCallback?: (
         onChange: (fieldProperties: any, value: any) => void
     ) => void;
+    onFieldChange?: (
+        name: string,
+        value: any,
+        fieldValues: { [fieldName: string]: any }
+    ) => void;
 }
 
 export const GenericDialog = observer(
@@ -327,6 +332,14 @@ export const GenericDialog = observer(
 
         onChange = (fieldProperties: any, value: any) => {
             this.fieldValues[fieldProperties.name] = value;
+
+            if (this.props.onFieldChange) {
+                this.props.onFieldChange(
+                    fieldProperties.name,
+                    value,
+                    this.fieldValues
+                );
+            }
 
             if (this.errorMessages) {
                 // revalidate
