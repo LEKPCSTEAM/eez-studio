@@ -39,7 +39,7 @@
         }
       ],
       "destinationFolder": ".",
-      "lvglInclude": "lvgl/lvgl.h"
+      "lvglInclude": "lvgl.h"
     }
   },
   "variables": {

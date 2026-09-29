@@ -355,6 +355,9 @@ const newCommand: CommandDef = {
             if (json.settings.general.projectType == "lvgl" && (!template || template == "official" || ctx.str("lvgl"))) {
                 json.settings.general.lvglVersion = lvglVersion;
             }
+            if (json.settings.general.projectType == "lvgl" && template == "official") {
+                json.settings.build = { ...json.settings.build, lvglInclude: "lvgl.h" };
+            }
 
             // resource files used by the template (fonts ...)
             if (resourceBase && type.files) {

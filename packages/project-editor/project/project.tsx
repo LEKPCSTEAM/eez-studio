@@ -414,7 +414,7 @@ export class Build extends EezObject {
 
         beforeLoadHook: (object: Build, jsObject: Partial<Build>) => {
             if (!jsObject.lvglInclude) {
-                jsObject.lvglInclude = "lvgl/lvgl.h";
+                jsObject.lvglInclude = "lvgl.h";
             }
 
             if (jsObject.generateSourceCodeForEezFramework == undefined) {

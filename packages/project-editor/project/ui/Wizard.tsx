@@ -1669,6 +1669,10 @@ export class WizardModel {
                     ) {
                         projectTemplate.settings.general.lvglVersion =
                             this.lvglVersion;
+                        projectTemplate.settings.build = {
+                            ...projectTemplate.settings.build,
+                            lvglInclude: "lvgl.h"
+                        };
                     } else if (this.type == "IEXT") {
                         projectTemplate.settings.general.commandsProtocol =
                             this.commandsProtocol;
