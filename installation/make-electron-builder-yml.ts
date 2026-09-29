@@ -60,6 +60,16 @@ async function getExtraResource() {
 
 const productName = "EEZ Studio";
 
+// On GitHub Actions publish releases to the repository the workflow runs in
+// (e.g. a fork), otherwise electron-builder uses package.json "repository"
+function getPublish() {
+    const [owner, repo] = (process.env.GITHUB_REPOSITORY || "").split("/");
+    if (!owner || !repo) {
+        return undefined;
+    }
+    return { provider: "github", owner, repo };
+}
+
 let files = [
     "build/**",
     "libs/**",
@@ -114,6 +124,8 @@ files.push(
 );
 
 (async function () {
+    const publish = getPublish();
+
     const config: any = {
         appId: "hr.envox.eez.studio",
         copyright: "Copyright © 2022 Envox d.o.o.",
@@ -131,6 +143,8 @@ files.push(
         ],
 
         extraResources: await getExtraResource(),
+
+        ...(publish ? { publish } : {}),
 
         fileAssociations: [
             {
