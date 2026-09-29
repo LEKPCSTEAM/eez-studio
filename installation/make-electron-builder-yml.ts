@@ -100,7 +100,13 @@ let files = [
     "!node_modules/koffi/src",
     "!node_modules/koffi/doc",
     "!node_modules/tabulator-tables/src",
-    "!node_modules/koffi/build/koffi/**"
+    "!node_modules/koffi/build/koffi/**",
+    // only WebGPU/WASM (JSEP) build of onnxruntime-web is used (AI background removal)
+    "!node_modules/onnxruntime-web/dist/**",
+    "!node_modules/onnxruntime-web/lib/**",
+    "node_modules/onnxruntime-web/dist/ort.webgpu.min.js",
+    "node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.jsep.mjs",
+    "node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.jsep.wasm"
 ];
 
 files.push(
@@ -120,7 +126,8 @@ files.push(
         files,
 
         asarUnpack: [
-            "node_modules/pngquant-bin/**"
+            "node_modules/pngquant-bin/**",
+            "node_modules/onnxruntime-web/dist/**"
         ],
 
         extraResources: await getExtraResource(),
