@@ -74,8 +74,6 @@ export interface IFieldProperties {
     formText?: string;
     checkboxStyleSwitch?: boolean;
     inputGroupButton?: React.ReactNode;
-    // called after field value is changed, fieldValues can be modified to update other fields
-    onChange?: (value: any, fieldValues: any) => void;
 }
 
 export interface IFieldComponentProps {
@@ -198,6 +196,11 @@ interface GenericDialogProps {
     onValueChange?: (name: string, value: string) => void;
     setOnChangeCallback?: (
         onChange: (fieldProperties: any, value: any) => void
+    ) => void;
+    onFieldChange?: (
+        name: string,
+        value: any,
+        fieldValues: { [fieldName: string]: any }
     ) => void;
 }
 
@@ -330,8 +333,12 @@ export const GenericDialog = observer(
         onChange = (fieldProperties: any, value: any) => {
             this.fieldValues[fieldProperties.name] = value;
 
-            if (fieldProperties.onChange) {
-                fieldProperties.onChange(value, this.fieldValues);
+            if (this.props.onFieldChange) {
+                this.props.onFieldChange(
+                    fieldProperties.name,
+                    value,
+                    this.fieldValues
+                );
             }
 
             if (this.errorMessages) {

@@ -1897,7 +1897,7 @@ export class Font extends EezObject {
 
             let values = projectStore.projectTypeTraits.isLVGL
                 ? {
-                      size: 14,
+                      sizes: "14",
                       bpp: getLvglDefaultFontBpp(parent),
                       ranges: "32-127",
                       symbols: "",
@@ -1907,7 +1907,7 @@ export class Font extends EezObject {
                   }
                 : {
                       renderingEngine: "opentype",
-                      size: 14,
+                      sizes: "14",
                       bpp: 8,
                       threshold: 128,
                       fromGlyph: 32,
@@ -1934,8 +1934,12 @@ export class Font extends EezObject {
                                         validators: [
                                             validators.required,
                                             validators.invalidCharacters("."),
-                                            validators.unique(undefined, parent)
-                                        ]
+                                            uniqueFontNamesForSizes(
+                                                parent as Font[]
+                                            )
+                                        ],
+                                        formText:
+                                            "With multiple sizes fonts are named <name>_<size>"
                                     },
                                     {
                                         name: "filePath",
@@ -1968,9 +1972,15 @@ export class Font extends EezObject {
                                             values.useFreeType === false
                                     },
                                     {
-                                        name: "size",
-                                        displayName: "Font size (pixels)",
-                                        type: "number"
+                                        name: "sizes",
+                                        displayName: "Font sizes (pixels)",
+                                        type: "string",
+                                        validators: [
+                                            validators.required,
+                                            validateFontSizes
+                                        ],
+                                        formText:
+                                            "One or more sizes separated by comma. Example: 12,14,16,18,20"
                                     },
                                     {
                                         name: "ranges",
@@ -2059,7 +2069,8 @@ export class Font extends EezObject {
                             },
                             values,
                             modal: true,
-                            backdrop: "static"
+                            backdrop: "static",
+                            onFieldChange: setFontNameFromFilePath()
                         });
 
                         result.values.renderingEngine = "LVGL";
@@ -2092,8 +2103,12 @@ export class Font extends EezObject {
                                         type: "string",
                                         validators: [
                                             validators.required,
-                                            validators.unique(undefined, parent)
-                                        ]
+                                            uniqueFontNamesForSizes(
+                                                parent as Font[]
+                                            )
+                                        ],
+                                        formText:
+                                            "With multiple sizes fonts are named <name>_<size>"
                                     },
                                     {
                                         name: "filePath",
@@ -2138,9 +2153,15 @@ export class Font extends EezObject {
                                             isEezGuiLiteProject(parent)
                                     },
                                     {
-                                        name: "size",
-                                        displayName: "Font size (points)",
-                                        type: "number"
+                                        name: "sizes",
+                                        displayName: "Font sizes (points)",
+                                        type: "string",
+                                        validators: [
+                                            validators.required,
+                                            validateFontSizes
+                                        ],
+                                        formText:
+                                            "One or more sizes separated by comma. Example: 12,14,16,18,20"
                                     },
                                     {
                                         name: "threshold",
@@ -2177,106 +2198,135 @@ export class Font extends EezObject {
                             },
                             values,
                             modal: true,
-                            backdrop: "static"
+                            backdrop: "static",
+                            onFieldChange: setFontNameFromFilePath()
                         });
                     }
 
                     values = result.values;
 
                     try {
-                        let font;
-                        if (
-                            projectStore.projectTypeTraits.isLVGL &&
-                            result.values.useFreeType
-                        ) {
-                            let relativeFilePath = getProjectStore(
-                                parent
-                            ).getFilePathRelativeToProjectPath(
-                                result.values.filePath
+                        const sizes = parseFontSizes(result.values.sizes)!;
+
+                        const encodings = projectStore.projectTypeTraits.isLVGL
+                            ? result.values.encodings
+                            : result.values.createGlyphs
+                              ? result.values.encodings
+                                  ? result.values.encodings
+                                  : [
+                                        {
+                                            from: result.values.fromGlyph,
+                                            to: result.values.toGlyph
+                                        }
+                                    ]
+                              : [];
+
+                        const fonts: Font[] = [];
+
+                        for (const size of sizes) {
+                            const fontName = getFontNameForSize(
+                                result.values.name,
+                                size,
+                                sizes
                             );
 
-                            font = createObject<Font>(
-                                projectStore,
-                                {
-                                    name: result.values.name,
-                                    source: {
-                                        filePath: relativeFilePath,
-                                        size: result.values.size
-                                    } as any,
-                                    glyphs: [],
-                                    lvglUseFreeType: true,
-                                    lvglFreeTypeRenderMode:
-                                        result.values.lvglFreeTypeRenderMode,
-                                    lvglFreeTypeStyle:
-                                        result.values.lvglFreeTypeStyle,
-                                    lvglFreeTypeFilePath:
-                                        result.values.lvglFreeTypeFilePath
-                                },
-                                Font
-                            );
-                        } else {
-                            let absoluteFilePath = result.values.filePath;
-                            let relativeFilePath = getProjectStore(
-                                parent
-                            ).getFilePathRelativeToProjectPath(
-                                result.values.filePath
-                            );
+                            let font;
+                            if (
+                                projectStore.projectTypeTraits.isLVGL &&
+                                result.values.useFreeType
+                            ) {
+                                let relativeFilePath = getProjectStore(
+                                    parent
+                                ).getFilePathRelativeToProjectPath(
+                                    result.values.filePath
+                                );
 
-                            const fontProperties = await extractFont({
-                                name: result.values.name,
-                                absoluteFilePath,
-                                relativeFilePath,
-                                renderingEngine: result.values.renderingEngine,
-                                bpp: result.values.bpp,
-                                size: result.values.size,
-                                threshold: result.values.threshold,
-                                createGlyphs: result.values.createGlyphs,
-                                encodings: projectStore.projectTypeTraits.isLVGL
-                                    ? result.values.encodings
-                                    : result.values.createGlyphs
-                                      ? result.values.encodings
-                                          ? result.values.encodings
-                                          : [
-                                                {
-                                                    from: result.values
-                                                        .fromGlyph,
-                                                    to: result.values.toGlyph
-                                                }
-                                            ]
-                                      : [],
-                                symbols: result.values.symbols,
-                                createBlankGlyphs:
-                                    result.values.createBlankGlyphs,
-                                doNotAddGlyphIfNotFound: false,
-                                lvglVersion:
-                                    projectStore.project.settings.general
-                                        .lvglVersion,
-                                lvglInclude:
-                                    projectStore.project.settings.build
-                                        .lvglInclude,
-                                getAllGlyphs: projectStore.projectTypeTraits
-                                    .isLVGL
-                                    ? true
-                                    : undefined
-                            });
+                                font = createObject<Font>(
+                                    projectStore,
+                                    {
+                                        name: fontName,
+                                        source: {
+                                            filePath: relativeFilePath,
+                                            size
+                                        } as any,
+                                        glyphs: [],
+                                        lvglUseFreeType: true,
+                                        lvglFreeTypeRenderMode:
+                                            result.values
+                                                .lvglFreeTypeRenderMode,
+                                        lvglFreeTypeStyle:
+                                            result.values.lvglFreeTypeStyle,
+                                        lvglFreeTypeFilePath:
+                                            result.values.lvglFreeTypeFilePath
+                                    },
+                                    Font
+                                );
+                            } else {
+                                let absoluteFilePath = result.values.filePath;
+                                let relativeFilePath = getProjectStore(
+                                    parent
+                                ).getFilePathRelativeToProjectPath(
+                                    result.values.filePath
+                                );
 
-                            if (projectStore.projectTypeTraits.isLVGL) {
-                                (fontProperties as Font).lvglRanges =
-                                    lvglRanges;
-                                (fontProperties as Font).lvglSymbols =
-                                    lvglSymbols;
+                                const fontProperties = await extractFont({
+                                    name: fontName,
+                                    absoluteFilePath,
+                                    relativeFilePath,
+                                    renderingEngine:
+                                        result.values.renderingEngine,
+                                    bpp: result.values.bpp,
+                                    size,
+                                    threshold: result.values.threshold,
+                                    createGlyphs: result.values.createGlyphs,
+                                    encodings,
+                                    symbols: result.values.symbols,
+                                    createBlankGlyphs:
+                                        result.values.createBlankGlyphs,
+                                    doNotAddGlyphIfNotFound: false,
+                                    lvglVersion:
+                                        projectStore.project.settings.general
+                                            .lvglVersion,
+                                    lvglInclude:
+                                        projectStore.project.settings.build
+                                            .lvglInclude,
+                                    getAllGlyphs: projectStore
+                                        .projectTypeTraits.isLVGL
+                                        ? true
+                                        : undefined
+                                });
+
+                                if (projectStore.projectTypeTraits.isLVGL) {
+                                    (fontProperties as Font).lvglRanges =
+                                        lvglRanges;
+                                    (fontProperties as Font).lvglSymbols =
+                                        lvglSymbols;
+                                }
+
+                                font = createObject<Font>(
+                                    projectStore,
+                                    fontProperties as any,
+                                    Font
+                                );
                             }
 
-                            font = createObject<Font>(
-                                projectStore,
-                                fontProperties as any,
-                                Font
-                            );
+                            fonts.push(font);
                         }
 
-                        notification.info(`Added ${result.values.name} font.`);
+                        // the last font is added by the caller
+                        for (let i = 0; i < fonts.length - 1; i++) {
+                            projectStore.addObject(parent, fonts[i]);
+                        }
 
-                        return font;
+                        notification.info(
+                            `Added ${fonts
+                                .map(font => font.name)
+                                .join(", ")} font${
+                                fonts.length > 1 ? "s" : ""
+                            }.`
+                        );
+
+                        return fonts[fonts.length - 1];
                     } catch (err: any) {
                         let errorMessage;
                         if (err) {
@@ -2626,6 +2676,81 @@ export function requiredRangesOrSymbols(object: any, ruleName: string) {
     }
 
     return null;
+}
+
+// Parses a comma (or space) separated list of font sizes, e.g. "12, 14, 16".
+// Returns undefined if the list is empty or contains an invalid size.
+export function parseFontSizes(sizes: any): number[] | undefined {
+    if (sizes == undefined) {
+        return undefined;
+    }
+
+    const result: number[] = [];
+    for (const part of sizes.toString().split(/[,\s]+/)) {
+        if (part === "") {
+            continue;
+        }
+        const size = Number(part);
+        if (!Number.isFinite(size) || size <= 0) {
+            return undefined;
+        }
+        if (result.indexOf(size) === -1) {
+            result.push(size);
+        }
+    }
+
+    return result.length > 0 ? result : undefined;
+}
+
+export function validateFontSizes(object: any, ruleName: string) {
+    return parseFontSizes(object[ruleName])
+        ? null
+        : "Invalid font size list. Example: 12,14,16,18,20";
+}
+
+// With multiple sizes every font gets the "<name>_<size>" name.
+export function getFontNameForSize(
+    name: string,
+    size: number,
+    sizes: number[]
+) {
+    return sizes.length > 1 ? `${name}_${size}` : name;
+}
+
+function uniqueFontNamesForSizes(fonts: Font[]) {
+    return (object: any, ruleName: string) => {
+        const name = object[ruleName];
+        const sizes = parseFontSizes(object.sizes);
+        if (!name || !sizes) {
+            return null;
+        }
+
+        const existing = sizes
+            .map(size => getFontNameForSize(name, size, sizes))
+            .filter(fontName => fonts.find(font => font.name === fontName));
+
+        return existing.length > 0
+            ? `Font already exists: ${existing.join(", ")}`
+            : null;
+    };
+}
+
+// Fills the font name from the selected font file name, unless the user
+// already typed a custom name.
+function setFontNameFromFilePath() {
+    let autoName: string | undefined;
+    return (name: string, value: any, fieldValues: any) => {
+        if (name !== "filePath" || typeof value !== "string" || !value) {
+            return;
+        }
+        if (fieldValues.name && fieldValues.name !== autoName) {
+            return;
+        }
+        autoName = path
+            .basename(value, path.extname(value))
+            .replace(/[^a-zA-Z0-9_]/g, "_");
+        fieldValues.name = autoName;
+    };
 }
 
 export function removeDuplicates(encodings: EncodingRange[], symbols: string) {

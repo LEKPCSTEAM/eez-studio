@@ -48,3 +48,5 @@ tools/lvgl-api/build
 /test/**
 
 .claude
+
+tmp/*

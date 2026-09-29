@@ -346,24 +346,6 @@ export class Bitmap extends EezObject {
                             displayName: "Image",
                             type: MultipleAbsoluteFileInput,
                             validators: [validators.required],
-                            onChange: (filePaths: string[], values: any) => {
-                                if (
-                                    !filePaths ||
-                                    filePaths.length != 1 ||
-                                    (values.name && values.name != autoName)
-                                ) {
-                                    return;
-                                }
-                                autoName = getUniquePropertyValue(
-                                    projectStore.project.bitmaps,
-                                    "name",
-                                    // "." is not allowed in bitmap name
-                                    path
-                                        .parse(filePaths[0])
-                                        .name.replace(/\./g, "_")
-                                ) as string;
-                                values.name = autoName;
-                            },
                             options: {
                                 filters: [
                                     {
@@ -408,7 +390,28 @@ export class Bitmap extends EezObject {
                     editImage: false
                 },
                 modal: true,
-                backdrop: "static"
+                backdrop: "static",
+                onFieldChange: (
+                    fieldName: string,
+                    filePaths: string[],
+                    values: any
+                ) => {
+                    if (
+                        fieldName != "imageFilePaths" ||
+                        !filePaths ||
+                        filePaths.length != 1 ||
+                        (values.name && values.name != autoName)
+                    ) {
+                        return;
+                    }
+                    autoName = getUniquePropertyValue(
+                        projectStore.project.bitmaps,
+                        "name",
+                        // "." is not allowed in bitmap name
+                        path.parse(filePaths[0]).name.replace(/\./g, "_")
+                    ) as string;
+                    values.name = autoName;
+                }
             });
 
             const bpp: number = result.values.bpp;
