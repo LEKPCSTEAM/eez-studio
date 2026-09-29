@@ -6,7 +6,12 @@ import { ListNavigation } from "project-editor/ui-components/ListNavigation";
 import { FlexLayoutContainer } from "eez-studio-ui/FlexLayout";
 import { isObjectExists } from "project-editor/store";
 import { ProjectContext } from "project-editor/project/context";
-import { Bitmap, createBitmapFromFile } from "./bitmap";
+import {
+    Bitmap,
+    canEditBitmapImage,
+    createBitmapFromFile,
+    editBitmapImage
+} from "./bitmap";
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -112,9 +117,27 @@ const BitmapEditor = observer(
                     className="EezStudio_BitmapEditorContainer"
                     style={{ padding: 10 }}
                 >
-                    <div style={{ marginBottom: 10 }}>
-                        Dimension: {bitmap.imageElement.width} x{" "}
-                        {bitmap.imageElement.height} px
+                    <div
+                        style={{
+                            marginBottom: 10,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 10
+                        }}
+                    >
+                        <span>
+                            Dimension: {bitmap.imageElement.width} x{" "}
+                            {bitmap.imageElement.height} px
+                        </span>
+                        {canEditBitmapImage(bitmap) && (
+                            <button
+                                type="button"
+                                className="btn btn-sm btn-outline-secondary"
+                                onClick={() => editBitmapImage(bitmap)}
+                            >
+                                Edit Image...
+                            </button>
+                        )}
                     </div>
                     <div>
                         <img
