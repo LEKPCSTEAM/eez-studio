@@ -1027,6 +1027,29 @@ export class TreeAdapter {
         }
     }
 
+    selectObjects(objects: IEezObject[]) {
+        if (objects.length == 0) {
+            return;
+        }
+
+        this.selectObject(objects[0]);
+
+        const items: TreeObjectAdapter[] = [];
+        for (const object of objects) {
+            const item = this.getItemFromId(getId(object));
+            if (item) {
+                items.push(item);
+
+                const parent = this.getItemParent(item);
+                if (parent) {
+                    this.expandItem(parent);
+                }
+            }
+        }
+
+        this.selectItems(items);
+    }
+
     toggleSelected(item: TreeObjectAdapter): void {
         this.rootItem.toggleSelected(item);
     }
@@ -1100,16 +1123,46 @@ export class TreeAdapter {
     }
 
     isDragSource(item: TreeObjectAdapter) {
-        return DragAndDropManager.dragObject === item.object;
+        return DragAndDropManager.dragObjects.includes(item.object as any);
+    }
+
+    // If the dragged item is part of a multiple selection, drag all selected
+    // objects (in tree order), skipping those whose ancestor is also selected.
+    getDragObjects(item: TreeObjectAdapter) {
+        if (!item.selected) {
+            return [item.object as EezObject];
+        }
+
+        const selectedObjects = this.rootItem.selectedObjects as EezObject[];
+        if (selectedObjects.length < 2) {
+            return [item.object as EezObject];
+        }
+
+        const dragObjects = selectedObjects.filter(
+            object =>
+                !selectedObjects.some(
+                    other => other !== object && isAncestor(object, other)
+                )
+        );
+
+        if (!dragObjects.every(object => isArrayElement(object))) {
+            return [item.object as EezObject];
+        }
+
+        return dragObjects;
     }
 
     onDragStart(item: TreeObjectAdapter, event: any) {
         const projectStore = getProjectStore(this.rootItem.object);
 
+        const dragObjects = this.getDragObjects(item);
+
         event.dataTransfer.effectAllowed = "copyMove";
         setClipboardData(
             event,
-            objectToClipboardData(projectStore, item.object)
+            dragObjects.length > 1
+                ? projectStore.objectsToClipboardData(dragObjects)
+                : objectToClipboardData(projectStore, item.object)
         );
         event.dataTransfer.setDragImage(
             DragAndDropManager.blankDragImage,
@@ -1119,7 +1172,12 @@ export class TreeAdapter {
 
         // postpone render, otherwise we can receive onDragEnd immediatelly
         setTimeout(() => {
-            DragAndDropManager.start(event, item.object as any, projectStore);
+            DragAndDropManager.start(
+                event,
+                dragObjects[0],
+                projectStore,
+                dragObjects
+            );
         });
     }
 
@@ -1156,41 +1214,45 @@ export class TreeAdapter {
         if (DragAndDropManager.dragObject) {
             const projectStore = getProjectStore(this.rootItem.object);
 
-            const dragObjectClone =
-                DragAndDropManager.dropEffect == "copy"
-                    ? (createObject(
-                          projectStore,
-                          toJS(DragAndDropManager.dragObject) as any,
-                          getClass(DragAndDropManager.dragObject),
-                          undefined,
-                          true
-                      ) as EezObject)
-                    : DragAndDropManager.dragObject;
+            const dragObjectClones = DragAndDropManager.dragObjects.map(
+                dragObject =>
+                    DragAndDropManager.dropEffect == "copy"
+                        ? (createObject(
+                              projectStore,
+                              toJS(dragObject) as any,
+                              getClass(dragObject),
+                              undefined,
+                              true
+                          ) as EezObject)
+                        : dragObject
+            );
 
             let dropItem = DragAndDropManager.dropObject as TreeObjectAdapter;
 
-            let aNewObject: IEezObject | undefined;
+            let newObjects: IEezObject[] = [];
 
             if (dropPosition == DropPosition.DROP_POSITION_BEFORE) {
                 DragAndDropManager.deleteDragItem(true, {
                     dropPlace: getParent(dropItem.object)
                 });
-                aNewObject = insertObjectBefore(
-                    dropItem.object,
-                    dragObjectClone
-                );
+                for (const dragObjectClone of dragObjectClones) {
+                    newObjects.push(
+                        insertObjectBefore(dropItem.object, dragObjectClone)
+                    );
+                }
             } else if (dropPosition == DropPosition.DROP_POSITION_AFTER) {
                 DragAndDropManager.deleteDragItem(true, {
                     dropPlace: getParent(dropItem.object)
                 });
-                aNewObject = insertObjectAfter(
-                    dropItem.object,
-                    dragObjectClone
-                );
+                let prevObject = dropItem.object;
+                for (const dragObjectClone of dragObjectClones) {
+                    prevObject = insertObjectAfter(prevObject, dragObjectClone);
+                    newObjects.push(prevObject);
+                }
             } else if (dropPosition == DropPosition.DROP_POSITION_INSIDE) {
                 let dropPlace = findPastePlaceInside(
                     dropItem.object,
-                    getClassInfo(dragObjectClone),
+                    getClassInfo(dragObjectClones[0]),
                     true
                 );
                 if (dropPlace) {
@@ -1199,11 +1261,16 @@ export class TreeAdapter {
                     });
 
                     if (isArray(dropPlace as any)) {
-                        aNewObject = projectStore.addObject(
-                            dropPlace as any,
-                            dragObjectClone
-                        );
+                        for (const dragObjectClone of dragObjectClones) {
+                            newObjects.push(
+                                projectStore.addObject(
+                                    dropPlace as any,
+                                    dragObjectClone
+                                )
+                            );
+                        }
                     } else {
+                        const dragObjectClone = dragObjectClones[0];
                         projectStore.updateObject(dropItem.object, {
                             [(dropPlace as PropertyInfo).name]: dragObjectClone
                         });
@@ -1211,13 +1278,15 @@ export class TreeAdapter {
                             dragObjectClone,
                             (dropPlace as PropertyInfo).name
                         );
-                        aNewObject = dragObjectClone;
+                        newObjects.push(dragObjectClone);
                     }
                 }
             }
 
-            if (aNewObject) {
-                this.selectObject(aNewObject);
+            if (newObjects.length == 1) {
+                this.selectObject(newObjects[0]);
+            } else if (newObjects.length > 1) {
+                this.selectObjects(newObjects);
             }
         }
 
@@ -1225,7 +1294,9 @@ export class TreeAdapter {
     }
 
     isAncestorOfDragObject(dropItem: TreeObjectAdapter) {
-        return isAncestor(dropItem.object, DragAndDropManager.dragObject!);
+        return DragAndDropManager.dragObjects.some(dragObject =>
+            isAncestor(dropItem.object, dragObject)
+        );
     }
 
     canDrop(
@@ -1239,7 +1310,13 @@ export class TreeAdapter {
             return false;
         }
 
-        if (!canContain(dropItem.object, dragObject)) {
+        const dragObjects = DragAndDropManager.dragObjects;
+
+        if (
+            !dragObjects.every(dragObject =>
+                canContain(dropItem.object, dragObject)
+            )
+        ) {
             return false;
         }
 
@@ -1252,9 +1329,11 @@ export class TreeAdapter {
         if (
             !(
                 isArrayElement(dropItem.object) &&
-                isObjectInstanceOf(
-                    dragObject,
-                    getClassInfo(getParent(dropItem.object))
+                dragObjects.every(dragObject =>
+                    isObjectInstanceOf(
+                        dragObject,
+                        getClassInfo(getParent(dropItem.object))
+                    )
                 )
             )
         ) {
@@ -1262,8 +1341,12 @@ export class TreeAdapter {
         }
 
         // check: it makes no sense to drop dragObject before or after itself
-        if (dropItem.object === dragObject) {
+        if (dragObjects.includes(dropItem.object as EezObject)) {
             return false;
+        }
+
+        if (dragObjects.length > 1) {
+            return true;
         }
 
         if (getParent(dropItem.object) === getParent(dragObject)) {
@@ -1284,14 +1367,43 @@ export class TreeAdapter {
     }
 
     canDropInside(dropItem: TreeObjectAdapter) {
-        if (!canContain(dropItem.object, DragAndDropManager.dragObject!)) {
+        const dragObjects = DragAndDropManager.dragObjects;
+        if (dragObjects.length == 0) {
             return false;
         }
 
-        return !!findPastePlaceInside(
+        if (
+            !dragObjects.every(dragObject =>
+                canContain(dropItem.object, dragObject)
+            )
+        ) {
+            return false;
+        }
+
+        const dropPlace = findPastePlaceInside(
             dropItem.object,
-            getClassInfo(DragAndDropManager.dragObject!),
+            getClassInfo(dragObjects[0]),
             true
+        );
+        if (!dropPlace) {
+            return false;
+        }
+
+        if (dragObjects.length == 1) {
+            return true;
+        }
+
+        // multiple objects can only be dropped into the same array
+        return (
+            isArray(dropPlace as any) &&
+            dragObjects.every(
+                dragObject =>
+                    findPastePlaceInside(
+                        dropItem.object,
+                        getClassInfo(dragObject),
+                        true
+                    ) === dropPlace
+            )
         );
     }
 

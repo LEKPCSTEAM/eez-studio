@@ -15,6 +15,9 @@ interface IDropObject {}
 
 export class DragAndDropManagerClass {
     dragObject: EezObject | undefined;
+    // all dragged objects (dragObject is the first one), used when multiple
+    // tree items are dragged at once
+    dragObjects: EezObject[] = [];
     dropObject: IDropObject | undefined;
     projectStore: ProjectStore;
     dragItemDeleted: boolean;
@@ -27,6 +30,7 @@ export class DragAndDropManagerClass {
     constructor() {
         makeObservable(this, {
             dragObject: observable,
+            dragObjects: observable.shallow,
             dropObject: observable,
             start: action,
             setDropObject: action,
@@ -39,8 +43,15 @@ export class DragAndDropManagerClass {
             "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAAYdEVYdFNvZnR3YXJlAHBhaW50Lm5ldCA0LjAuOWwzfk4AAAANSURBVBhXY/j//z8DAAj8Av6IXwbgAAAAAElFTkSuQmCC";
     }
 
-    start(event: any, dragObject: EezObject, projectStore: ProjectStore) {
+    start(
+        event: any,
+        dragObject: EezObject,
+        projectStore: ProjectStore,
+        dragObjects?: EezObject[]
+    ) {
         this.dragObject = dragObject;
+        this.dragObjects =
+            dragObjects && dragObjects.length > 0 ? dragObjects : [dragObject];
         this.dragItemDeleted = false;
 
         this.undoManager = projectStore.undoManager;
@@ -70,9 +81,9 @@ export class DragAndDropManagerClass {
         options?: { dropPlace?: IEezObject | PropertyInfo }
     ) {
         if ((force || this.dropObject) && this.dropEffect == "move") {
-            if (this.dragObject) {
+            for (const dragObject of this.dragObjects) {
                 this.undoManager?.projectStore.deleteObject(
-                    this.dragObject,
+                    dragObject,
                     options
                 );
             }
@@ -87,6 +98,7 @@ export class DragAndDropManagerClass {
             this.deleteDragItem(false);
         }
         this.dragObject = undefined;
+        this.dragObjects = [];
         this.unsetDropObject();
 
         if (this.undoManager) {
