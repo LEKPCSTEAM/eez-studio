@@ -11,6 +11,7 @@ import {
 import { observer } from "mobx-react";
 
 import { Dialog, showDialog } from "eez-studio-ui/dialog";
+import * as notification from "eez-studio-ui/notification";
 import { IconAction } from "eez-studio-ui/action";
 
 import {
@@ -38,6 +39,10 @@ export interface ImageEditorOptions {
     // when set, "Fit to display" preset is available
     displayWidth?: number;
     displayHeight?: number;
+    // Called on OK when the image is modified, before the dialog is closed.
+    // If it returns false (e.g. saving was canceled) the dialog stays open,
+    // so the edits are not lost.
+    onSave?: (result: ImageEditorResult) => Promise<boolean>;
 }
 
 export interface ImageEditorResult {
@@ -79,6 +84,7 @@ export async function showImageEditor(
         const [modalDialog, _, root] = showDialog(
             <ImageEditorDialog
                 state={state}
+                onSave={opts.onSave}
                 onOk={onOk}
                 onCancel={onDispose}
             />,
@@ -978,6 +984,7 @@ function clampSize(value: number) {
 const ImageEditorDialog = observer(
     class ImageEditorDialog extends React.Component<{
         state: ImageEditorState;
+        onSave?: (result: ImageEditorResult) => Promise<boolean>;
         onOk: (result: ImageEditorResult) => void;
         onCancel: () => void;
     }> {
@@ -986,6 +993,16 @@ const ImageEditorDialog = observer(
             if (!result) {
                 // keep the dialog open, error is displayed in the sidebar
                 return false;
+            }
+            if (result.modified && this.props.onSave) {
+                try {
+                    if (!(await this.props.onSave(result))) {
+                        return false;
+                    }
+                } catch (err: any) {
+                    notification.error(err.toString());
+                    return false;
+                }
             }
             this.props.onOk(result);
             return true;

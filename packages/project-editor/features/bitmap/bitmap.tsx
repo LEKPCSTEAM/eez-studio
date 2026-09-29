@@ -41,7 +41,7 @@ import {
 
 import { getThemedColor } from "project-editor/features/style/theme";
 
-import { showGenericDialog } from "project-editor/core/util";
+import { isValidUrl, showGenericDialog } from "project-editor/core/util";
 
 import { MultipleAbsoluteFileInput } from "project-editor/ui-components/FileInput";
 import { findStyle } from "project-editor/project/project";
@@ -112,9 +112,15 @@ const ExportBitmapFilePropertyGridUI = observer(
             const bitmap = this.props.objects[0] as Bitmap;
             return (
                 <div style={{ marginTop: 10, display: "flex", gap: 10 }}>
-                    <Button color="primary" size="small" onClick={this.edit}>
-                        Edit Image
-                    </Button>
+                    {canEditBitmapImage(bitmap) && (
+                        <Button
+                            color="primary"
+                            size="small"
+                            onClick={this.edit}
+                        >
+                            Edit Image
+                        </Button>
+                    )}
                     {bitmap.image.startsWith("data:image/") && (
                         <Button
                             color="primary"
@@ -801,38 +807,53 @@ async function storeImageEditorResult(
     return projectStore.getFilePathRelativeToProjectPath(savedFilePath);
 }
 
+// Remote (http/https) images can't be edited because they can't be saved back.
+export function canEditBitmapImage(bitmap: Bitmap) {
+    return !!bitmap.image && !isValidUrl(bitmap.image);
+}
+
 export async function editBitmapImage(bitmap: Bitmap) {
     const projectStore = getProjectStore(bitmap);
 
+    if (!canEditBitmapImage(bitmap)) {
+        notification.error("Only embedded or local file images can be edited.");
+        return;
+    }
+
     try {
+        let image: string | undefined;
+
         const result = await showImageEditor({
             title: `Edit Image: ${bitmap.name}`,
             imageSrc: bitmap.imageSrc,
-            ...getImageEditorOptions(projectStore)
+            ...getImageEditorOptions(projectStore),
+            onSave: async result => {
+                if (bitmap.image.startsWith("data:image/")) {
+                    image = result.dataURL;
+                } else {
+                    const currentFilePath = bitmap.imageSrc;
+                    const filePath = await saveEditedImageFile(
+                        result.dataURL,
+                        getEditedImageDefaultPath(
+                            currentFilePath,
+                            result.width,
+                            result.height
+                        ),
+                        currentFilePath
+                    );
+                    if (filePath) {
+                        image =
+                            projectStore.getFilePathRelativeToProjectPath(
+                                filePath
+                            );
+                    }
+                }
+                return image != undefined;
+            }
         });
 
-        if (!result || !result.modified) {
+        if (!result || !result.modified || !image) {
             return;
-        }
-
-        let image;
-        if (bitmap.image.startsWith("data:image/")) {
-            image = result.dataURL;
-        } else {
-            const currentFilePath = bitmap.imageSrc;
-            const filePath = await saveEditedImageFile(
-                result.dataURL,
-                getEditedImageDefaultPath(
-                    currentFilePath,
-                    result.width,
-                    result.height
-                ),
-                currentFilePath
-            );
-            if (!filePath) {
-                return;
-            }
-            image = projectStore.getFilePathRelativeToProjectPath(filePath);
         }
 
         projectStore.updateObject(bitmap, { image });
@@ -870,7 +891,15 @@ export async function createBitmap(
             result = await showImageEditor({
                 title: `Import Image: ${path.basename(filePath)}`,
                 imageSrc: filePath,
-                ...getImageEditorOptions(projectStore)
+                ...getImageEditorOptions(projectStore),
+                onSave: async result => {
+                    image = await storeImageEditorResult(
+                        projectStore,
+                        result,
+                        filePath
+                    );
+                    return image != undefined;
+                }
             });
 
             if (!result) {
@@ -881,7 +910,7 @@ export async function createBitmap(
             result = await svgToPng(await loadSvgFile(filePath));
         }
 
-        if (result && result.modified) {
+        if (result && result.modified && !image) {
             image = await storeImageEditorResult(
                 projectStore,
                 result,
