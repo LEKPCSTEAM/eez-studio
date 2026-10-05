@@ -7,10 +7,14 @@ exports.default = async function notarizing(context) {
         return;
     }
 
+    if (!process.env.APPLEID || !process.env.APPLEIDPASS) {
+        console.log("Skipping notarization: APPLEID or APPLEIDPASS not set");
+        return;
+    }
+
     const appName = context.packager.appInfo.productFilename;
 
     console.log('Apple id: "' + process.env.APPLEID + '"');
-    console.log('Apple pass: "' + process.env.APPLEIDPASS + '"');
 
     return await notarize({
         appBundleId: "eu.envox.eez-studio",

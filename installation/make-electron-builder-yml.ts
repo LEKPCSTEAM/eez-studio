@@ -111,12 +111,13 @@ let files = [
     "!node_modules/koffi/doc",
     "!node_modules/tabulator-tables/src",
     "!node_modules/koffi/build/koffi/**",
-    // only WebGPU/WASM (JSEP) build of onnxruntime-web is used (AI background removal)
+    // only WebGPU/WASM build of onnxruntime-web is used (AI background removal)
     "!node_modules/onnxruntime-web/dist/**",
     "!node_modules/onnxruntime-web/lib/**",
     "node_modules/onnxruntime-web/dist/ort.webgpu.min.js",
-    "node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.jsep.mjs",
-    "node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.jsep.wasm"
+    // ort.webgpu.min.js loads the asyncify (not jsep) wasm build
+    "node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.asyncify.mjs",
+    "node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.asyncify.wasm"
 ];
 
 files.push(
