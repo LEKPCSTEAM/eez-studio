@@ -23,6 +23,7 @@ import {
 } from "main/window";
 import { settings } from "main/settings";
 import { APP_NAME } from "main/util";
+import { canInstallCliInPath, installCliInPath } from "main/cli-path";
 import { undoManager } from "eez-studio-shared/store";
 import { isDev } from "eez-studio-shared/util-electron";
 
@@ -131,6 +132,17 @@ function buildMacOSAppMenu(
             {
                 type: "separator"
             },
+            ...(canInstallCliInPath()
+                ? [
+                      {
+                          label: "Install 'eez-cli' Command in PATH",
+                          click: installCliInPath
+                      },
+                      {
+                          type: "separator" as const
+                      }
+                  ]
+                : []),
             {
                 label: "Services",
                 role: "services",

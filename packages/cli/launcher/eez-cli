@@ -1,0 +1,25 @@
+#!/bin/sh
+# eez-cli on PATH: runs eez-cli.js with the app's Electron as Node, no Node install needed.
+
+self="$0"
+while [ -L "$self" ]; do
+    link="$(readlink "$self")"
+    case "$link" in
+        /*) self="$link" ;;
+        *) self="$(dirname "$self")/$link" ;;
+    esac
+done
+dir="$(cd "$(dirname "$self")" && pwd)"
+# deb/rpm install this file as /usr/bin/eez-cli
+if [ ! -f "$dir/eez-cli.js" ]; then
+    dir="/opt/EEZ Studio/resources/cli"
+fi
+
+# <resources>/cli -> macOS Contents/MacOS, Linux install folder
+if [ -x "$dir/../../MacOS/EEZ Studio" ]; then
+    app="$dir/../../MacOS/EEZ Studio"
+else
+    app="$dir/../../eez-studio"
+fi
+
+ELECTRON_RUN_AS_NODE=1 exec "$app" "$dir/eez-cli.js" "$@"

@@ -1,0 +1,11 @@
+#!/bin/sh
+# Runs as root after the .pkg install; $2 is the install location (/Applications).
+
+target="$2/EEZ Studio.app/Contents/Resources/cli/eez-cli"
+if [ ! -x "$target" ]; then
+    target="/Applications/EEZ Studio.app/Contents/Resources/cli/eez-cli"
+fi
+
+mkdir -p /usr/local/bin
+ln -sf "$target" /usr/local/bin/eez-cli
+exit 0

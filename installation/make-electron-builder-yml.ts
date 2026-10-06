@@ -47,6 +47,19 @@ async function getExtraResource() {
                 to: "cli/eez-cli.js"
             },
             {
+                // eez-cli / eez-cli.cmd: the command added to PATH by the installers
+                from: "./packages/cli/launcher/eez-cli",
+                to: "cli/eez-cli"
+            },
+            {
+                from: "./packages/cli/launcher/eez-cli.cmd",
+                to: "cli/eez-cli.cmd"
+            },
+            {
+                from: "./packages/cli/skill/SKILL.md",
+                to: "cli/skill/SKILL.md"
+            },
+            {
                 from: "./LICENSE.TXT",
                 to: "."
             },
@@ -59,6 +72,10 @@ async function getExtraResource() {
 }
 
 const productName = "EEZ Studio";
+
+// fpm "source=destination" file mapping
+const linuxCliOnPath =
+    path.resolve("packages/cli/launcher/eez-cli") + "=/usr/bin/eez-cli";
 
 // On GitHub Actions publish releases to the repository the workflow runs in
 // (e.g. a fork), otherwise electron-builder uses package.json "repository"
@@ -211,7 +228,9 @@ files.push(
         },
 
         pkg: {
-            license: "LICENSE.TXT"
+            license: "LICENSE.TXT",
+            // relative to buildResources (build/): postinstall links /usr/local/bin/eez-cli
+            scripts: "../installation/pkg-scripts"
         },
 
         win: {
@@ -223,7 +242,16 @@ files.push(
             installerIcon: "./icon.ico",
             license: "LICENSE.TXT",
             warningsAsErrors: false,
-            shortcutName: productName
+            shortcutName: productName,
+            include: "installation/installer.nsh"
+        },
+
+        deb: {
+            fpm: [linuxCliOnPath]
+        },
+
+        rpm: {
+            fpm: [linuxCliOnPath]
         },
 
         linux: {

@@ -14,9 +14,9 @@ references by name, LVGL version specific properties, flow wiring) are only
 enforced by the app's model. The CLI keeps them valid.
 
 ```bash
-EEZ="node <eez-studio>/packages/cli/launcher/eez-cli.js"   # source checkout
-# installed app: EEZ="node <install folder>/resources/cli/eez-cli.js"
-#   Windows: %LOCALAPPDATA%/Programs/eezstudio/resources/cli/eez-cli.js
+EEZ=eez-cli                  # installed app: the installer puts eez-cli on the PATH
+# source checkout: EEZ="node <eez-studio>/packages/cli/launcher/eez-cli.js"
+# not on the PATH: EEZ="node <install folder>/resources/cli/eez-cli.js"
 $EEZ help                    # all commands
 $EEZ help widget add         # one command
 $EEZ help selectors          # how to address objects

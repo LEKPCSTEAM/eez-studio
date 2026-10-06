@@ -1,3 +1,7 @@
+import fs from "fs";
+import path from "path";
+
+import { sourceRootDir } from "eez-studio-shared/util";
 import { ProjectEditor } from "project-editor/project-editor-interface";
 import { Section } from "project-editor/store";
 
@@ -49,14 +53,27 @@ Use "schema class <Class>" or "obj props <selector>" to see property types.`,
 Names: widgets <type>_<name> (label_title, img_icon_home), pages <name>_page,
 everything snake_case ("eez-cli naming"). Batch many changes with
 "apply <file.json>" (one transaction, one save).
-Global options: -p <project>, --json, --dry-run, --force, --no-backup, --no-reload-gui`
+Global options: -p <project>, --json, --dry-run, --force, --no-backup, --no-reload-gui`,
+
+    get guide() {
+        return readAgentGuide();
+    }
 };
+
+// The agent skill (cli/skill/SKILL.md) without its YAML front matter
+function readAgentGuide() {
+    const file = path.join(sourceRootDir(), "cli", "skill", "SKILL.md");
+    return fs
+        .readFileSync(file, "utf8")
+        .replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n/, "")
+        .trim();
+}
 
 function helpCommand(): CommandDef {
     return {
         name: "help",
         summary: "List commands, or show help for a command or topic",
-        usage: "help [command...|selectors|values|workflow]",
+        usage: "help [command...|selectors|values|workflow|guide]",
         project: "none",
         group: "general",
         run(ctx) {
@@ -201,7 +218,11 @@ function infoCommand(): CommandDef {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-function reportProblems(ctx: CommandContext, problems: Problem[], title: string) {
+function reportProblems(
+    ctx: CommandContext,
+    problems: Problem[],
+    title: string
+) {
     const errors = problems.filter(p => p.type == "error");
     const warnings = problems.filter(p => p.type == "warning");
 
@@ -317,7 +338,8 @@ function openCommand(): CommandDef {
 function daemonCommand(): CommandDef {
     return {
         name: "daemon",
-        summary: "Keep EEZ Studio loaded in the background: repeated commands take milliseconds",
+        summary:
+            "Keep EEZ Studio loaded in the background: repeated commands take milliseconds",
         usage: `daemon start [--idle minutes] | daemon status | daemon stop
   handled by the eez-cli launcher; afterwards every "eez-cli <command>" is sent
   to the daemon (except repl, mcp and commands reading stdin).

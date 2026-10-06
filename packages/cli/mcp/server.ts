@@ -42,7 +42,8 @@ function withValues(argv: string[], values: any) {
 // x/y/width/height -> --at x,y / --size w,h; a missing value is left empty (kept)
 function pushGeometry(argv: string[], a: any) {
     const pair = (p: any, q: any) => `${p ?? ""},${q ?? ""}`;
-    if (a.x !== undefined || a.y !== undefined) argv.push("--at", pair(a.x, a.y));
+    if (a.x !== undefined || a.y !== undefined)
+        argv.push("--at", pair(a.x, a.y));
     if (a.width !== undefined || a.height !== undefined)
         argv.push("--size", pair(a.width, a.height));
 }
@@ -50,7 +51,8 @@ function pushGeometry(argv: string[], a: any) {
 function styleArgs(values: any) {
     // style values are simple key=value pairs
     return Object.entries(values ?? {}).map(
-        ([key, value]) => `${key}=${typeof value == "string" ? value : JSON.stringify(value)}`
+        ([key, value]) =>
+            `${key}=${typeof value == "string" ? value : JSON.stringify(value)}`
     );
 }
 
@@ -58,9 +60,12 @@ const TOOLS: Tool[] = [
     {
         name: "eez_help",
         description:
-            "Help for the EEZ Studio CLI: list of all commands, or help for one command / topic (selectors, values, workflow). Start here.",
+            'Help for the EEZ Studio CLI: list of all commands, or help for one command / topic (guide, selectors, values, workflow). Start with topic "guide": the full agent workflow.',
         inputSchema: obj({
-            topic: { type: "string", description: 'e.g. "widget add", "selectors", "lvgl-style"' }
+            topic: {
+                type: "string",
+                description: 'e.g. "widget add", "selectors", "lvgl-style"'
+            }
         }),
         toArgv: a => ["help", ...(a.topic ? String(a.topic).split(/\s+/) : [])]
     },
@@ -68,16 +73,14 @@ const TOOLS: Tool[] = [
         name: "eez_run",
         description:
             "Run any EEZ Studio CLI command (same syntax as the eez-cli command line, without the program name), e.g. 'page tree Main', 'widget add Button --page Main --name btnOk --at 20,20 --size 120,50', 'lvgl-style props --search color'. Covers every part of the project.",
-        inputSchema: obj(
-            {
-                command: { type: "string", description: "command line" },
-                argv: {
-                    type: "array",
-                    items: { type: "string" },
-                    description: "alternative to command: pre-split arguments"
-                }
+        inputSchema: obj({
+            command: { type: "string", description: "command line" },
+            argv: {
+                type: "array",
+                items: { type: "string" },
+                description: "alternative to command: pre-split arguments"
             }
-        ),
+        }),
         toArgv: a => {
             if (Array.isArray(a.argv)) return a.argv.map(String);
             const { splitCommandLine } = require("cli/args");
@@ -89,13 +92,25 @@ const TOOLS: Tool[] = [
         description: "Create a new EEZ Studio project and open it.",
         inputSchema: obj(
             {
-                file: { type: "string", description: "path of the new .eez-project file" },
+                file: {
+                    type: "string",
+                    description: "path of the new .eez-project file"
+                },
                 type: {
                     type: "string",
-                    enum: ["lvgl", "lvgl-flow", "firmware", "dashboard", "eez-gui-lite"],
+                    enum: [
+                        "lvgl",
+                        "lvgl-flow",
+                        "firmware",
+                        "dashboard",
+                        "eez-gui-lite"
+                    ],
                     description: "default lvgl"
                 },
-                lvglVersion: { type: "string", enum: ["8.4.0", "9.2.2", "9.3.0", "9.4.0", "9.5.0"] },
+                lvglVersion: {
+                    type: "string",
+                    enum: ["8.4.0", "9.2.2", "9.3.0", "9.4.0", "9.5.0"]
+                },
                 width: { type: "number" },
                 height: { type: "number" },
                 overwrite: { type: "boolean" }
@@ -106,20 +121,23 @@ const TOOLS: Tool[] = [
             const argv = ["project", "new", a.file];
             if (a.type) argv.push("--type", a.type);
             if (a.lvglVersion) argv.push("--lvgl", a.lvglVersion);
-            if (a.width && a.height) argv.push("--size", `${a.width}x${a.height}`);
+            if (a.width && a.height)
+                argv.push("--size", `${a.width}x${a.height}`);
             if (a.overwrite) argv.push("--force");
             return argv;
         }
     },
     {
         name: "eez_open",
-        description: "Open an existing .eez-project file (following calls use it).",
+        description:
+            "Open an existing .eez-project file (following calls use it).",
         inputSchema: obj({ file: { type: "string" } }, ["file"]),
         toArgv: a => ["open", a.file]
     },
     {
         name: "eez_info",
-        description: "Project overview: type, LVGL version, display size, collections and pages.",
+        description:
+            "Project overview: type, LVGL version, display size, collections and pages.",
         inputSchema: obj({}),
         toArgv: () => ["info"]
     },
@@ -127,7 +145,12 @@ const TOOLS: Tool[] = [
         name: "eez_tree",
         description:
             "Widget tree of a page with the selector of every widget (use selectors in other tools).",
-        inputSchema: obj({ page: { type: "string", description: "page name, default first page" } }),
+        inputSchema: obj({
+            page: {
+                type: "string",
+                description: "page name, default first page"
+            }
+        }),
         toArgv: a => ["page", "tree", ...(a.page ? [a.page] : [])]
     },
     {
@@ -137,7 +160,10 @@ const TOOLS: Tool[] = [
         inputSchema: obj(
             {
                 selector: { type: "string" },
-                depth: { type: "number", description: "expand child objects, default 1" },
+                depth: {
+                    type: "number",
+                    description: "expand child objects, default 1"
+                },
                 props: { type: "array", items: { type: "string" } }
             },
             ["selector"]
@@ -145,7 +171,8 @@ const TOOLS: Tool[] = [
         toArgv: a => {
             const argv = ["obj", "get", a.selector];
             if (a.depth !== undefined) argv.push("--depth", String(a.depth));
-            if (Array.isArray(a.props) && a.props.length) argv.push("--props", a.props.join(","));
+            if (Array.isArray(a.props) && a.props.length)
+                argv.push("--props", a.props.join(","));
             return argv;
         }
     },
@@ -154,7 +181,8 @@ const TOOLS: Tool[] = [
         description:
             "Properties (types, enum values, references) of a class, e.g. Button, Label, Page, Variable, SetVariable. Without class: list widget types.",
         inputSchema: obj({ class: { type: "string" } }),
-        toArgv: a => (a.class ? ["schema", "class", a.class] : ["widget", "types"])
+        toArgv: a =>
+            a.class ? ["schema", "class", a.class] : ["widget", "types"]
     },
     {
         name: "eez_add_widget",
@@ -162,21 +190,51 @@ const TOOLS: Tool[] = [
             "Add a widget to a page or container. Returns its selector. Position/size: numbers (px), '50%' or 'content' (LVGL).",
         inputSchema: obj(
             {
-                type: { type: "string", description: "e.g. Button, Label, Panel, Slider, Switch, Image" },
+                type: {
+                    type: "string",
+                    description:
+                        "e.g. Button, Label, Panel, Slider, Switch, Image"
+                },
                 page: { type: "string" },
-                parent: { type: "string", description: "selector of a container widget" },
-                name: { type: "string", description: "unique name, convention <type>_<name> snake_case, e.g. label_title, img_icon_home, btn_save (corrected automatically)" },
+                parent: {
+                    type: "string",
+                    description: "selector of a container widget"
+                },
+                name: {
+                    type: "string",
+                    description:
+                        "unique name, convention <type>_<name> snake_case, e.g. label_title, img_icon_home, btn_save (corrected automatically)"
+                },
                 x: { type: ["number", "string"] },
                 y: { type: ["number", "string"] },
                 width: { type: ["number", "string"] },
                 height: { type: ["number", "string"] },
-                style: { type: "string", description: "LVGL style name to use" },
-                flags: { type: "string", description: "e.g. +HIDDEN,-SCROLLABLE" },
+                style: {
+                    type: "string",
+                    description: "LVGL style name to use"
+                },
+                flags: {
+                    type: "string",
+                    description: "e.g. +HIDDEN,-SCROLLABLE"
+                },
                 states: { type: "string", description: "e.g. +CHECKED" },
-                index: { type: "number", description: "position in the child list" },
-                noLabel: { type: "boolean", description: "remove the default Label child (Button)" },
-                icon: { type: "string", description: "bitmap name: replace the default Label child with a centered Image" },
-                values: { type: "object", description: "other properties, e.g. {\"text\": \"OK\"}" }
+                index: {
+                    type: "number",
+                    description: "position in the child list"
+                },
+                noLabel: {
+                    type: "boolean",
+                    description: "remove the default Label child (Button)"
+                },
+                icon: {
+                    type: "string",
+                    description:
+                        "bitmap name: replace the default Label child with a centered Image"
+                },
+                values: {
+                    type: "object",
+                    description: 'other properties, e.g. {"text": "OK"}'
+                }
             },
             ["type"]
         ),
@@ -211,8 +269,12 @@ const TOOLS: Tool[] = [
             ["selector"]
         ),
         toArgv: a => {
-            const geometry = ["x", "y", "width", "height"].some(k => a[k] !== undefined);
-            const argv = geometry ? ["widget", "set", a.selector] : ["obj", "set", a.selector];
+            const geometry = ["x", "y", "width", "height"].some(
+                k => a[k] !== undefined
+            );
+            const argv = geometry
+                ? ["widget", "set", a.selector]
+                : ["obj", "set", a.selector];
             pushGeometry(argv, a);
             return withValues(argv, a.values);
         }
@@ -220,33 +282,47 @@ const TOOLS: Tool[] = [
     {
         name: "eez_style",
         description:
-            "LVGL styling. target = widget selector (local style) or style name (shared LVGL style; created if 'forWidgetType' is given). values = style properties, e.g. {\"bg_color\": \"#3949AB\", \"radius\": 8, \"text_font\": \"MONTSERRAT_20\"}. Use eez_run 'lvgl-style props' to list properties.",
+            'LVGL styling. target = widget selector (local style) or style name (shared LVGL style; created if \'forWidgetType\' is given). values = style properties, e.g. {"bg_color": "#3949AB", "radius": 8, "text_font": "MONTSERRAT_20"}. Use eez_run \'lvgl-style props\' to list properties.',
         inputSchema: obj(
             {
                 target: { type: "string" },
                 values: { type: "object" },
                 part: { type: "string", description: "default MAIN" },
-                state: { type: "string", description: "default DEFAULT, e.g. PRESSED, CHECKED" },
+                state: {
+                    type: "string",
+                    description: "default DEFAULT, e.g. PRESSED, CHECKED"
+                },
                 forWidgetType: {
                     type: "string",
-                    description: "create a new shared style for this widget type"
+                    description:
+                        "create a new shared style for this widget type"
                 },
                 apply: {
                     type: "array",
                     items: { type: "string" },
-                    description: "widget selectors that should use the shared style"
+                    description:
+                        "widget selectors that should use the shared style"
                 }
             },
             ["target", "values"]
         ),
         toArgv: a => {
             const commands: string[][] = [];
-            const isWidget = String(a.target).includes("/") || String(a.target).startsWith("@");
+            const isWidget =
+                String(a.target).includes("/") ||
+                String(a.target).startsWith("@");
             const common: string[] = [];
             if (a.part) common.push("--part", a.part);
             if (a.state) common.push("--state", a.state);
             if (isWidget) {
-                commands.push(["widget", "style", "set", a.target, ...common, ...styleArgs(a.values)]);
+                commands.push([
+                    "widget",
+                    "style",
+                    "set",
+                    a.target,
+                    ...common,
+                    ...styleArgs(a.values)
+                ]);
             } else if (a.forWidgetType) {
                 commands.push([
                     "lvgl-style",
@@ -258,7 +334,13 @@ const TOOLS: Tool[] = [
                     ...styleArgs(a.values)
                 ]);
             } else {
-                commands.push(["lvgl-style", "set", a.target, ...common, ...styleArgs(a.values)]);
+                commands.push([
+                    "lvgl-style",
+                    "set",
+                    a.target,
+                    ...common,
+                    ...styleArgs(a.values)
+                ]);
             }
             for (const widget of a.apply ?? []) {
                 commands.push(["lvgl-style", "apply", widget, a.target]);
@@ -268,19 +350,29 @@ const TOOLS: Tool[] = [
     },
     {
         name: "eez_remove",
-        description: "Remove an object by selector (refused if referenced unless force).",
-        inputSchema: obj({ selector: { type: "string" }, force: { type: "boolean" } }, ["selector"]),
+        description:
+            "Remove an object by selector (refused if referenced unless force).",
+        inputSchema: obj(
+            { selector: { type: "string" }, force: { type: "boolean" } },
+            ["selector"]
+        ),
         toArgv: a => ["obj", "rm", a.selector, ...(a.force ? ["--force"] : [])]
     },
     {
         name: "eez_apply",
         description:
-            "Run many CLI commands as one transaction (one save). operations: array of command lines, e.g. [\"page add Settings\", \"widget add Label --page Settings --name title text=Settings\"].",
+            'Run many CLI commands as one transaction (one save). operations: array of command lines, e.g. ["page add Settings", "widget add Label --page Settings --name title text=Settings"].',
         inputSchema: obj(
             {
                 operations: {
                     type: "array",
-                    items: { anyOf: [{ type: "string" }, { type: "array", items: { type: "string" } }, { type: "object" }] }
+                    items: {
+                        anyOf: [
+                            { type: "string" },
+                            { type: "array", items: { type: "string" } },
+                            { type: "object" }
+                        ]
+                    }
                 }
             },
             ["operations"]
@@ -289,13 +381,15 @@ const TOOLS: Tool[] = [
     },
     {
         name: "eez_check",
-        description: "Check the project for errors and warnings (same checks as the GUI).",
+        description:
+            "Check the project for errors and warnings (same checks as the GUI).",
         inputSchema: obj({ quick: { type: "boolean" } }),
         toArgv: a => ["check", ...(a.quick ? ["--quick"] : [])]
     },
     {
         name: "eez_build",
-        description: "Build the project (generates the UI source code / assets).",
+        description:
+            "Build the project (generates the UI source code / assets).",
         inputSchema: obj({}),
         toArgv: () => ["build"]
     },
@@ -304,12 +398,23 @@ const TOOLS: Tool[] = [
         description:
             "Render a page to a PNG image and return it, so you can see the design. Also reports layout issues (overlaps, outside screen, overflow). Use bounds=true to draw widget boxes and names.",
         inputSchema: obj({
-            page: { type: "string", description: "page or user widget name, default first page" },
+            page: {
+                type: "string",
+                description: "page or user widget name, default first page"
+            },
             scale: { type: "number", description: "1-8, default 1" },
             bounds: { type: "boolean" },
-            layout: { type: "boolean", description: "include the computed position/size of every widget" },
+            layout: {
+                type: "boolean",
+                description:
+                    "include the computed position/size of every widget"
+            },
             theme: { type: "string" },
-            output: { type: "string", description: "PNG file path (default <project>/.eez-render/<page>.png)" }
+            output: {
+                type: "string",
+                description:
+                    "PNG file path (default <project>/.eez-render/<page>.png)"
+            }
         }),
         toArgv: a => {
             const argv = ["render", "page", ...(a.page ? [a.page] : [])];
@@ -341,7 +446,10 @@ function compactResult(result: RunResult): any {
     }
     const changes: string[] = json.changes ?? [];
     if (changes.length > 8) {
-        out.changes = [...changes.slice(0, 5), `... and ${changes.length - 5} more`];
+        out.changes = [
+            ...changes.slice(0, 5),
+            `... and ${changes.length - 5} more`
+        ];
     } else if (changes.length > 0) {
         out.changes = changes;
     }
@@ -422,7 +530,9 @@ async function callTool(runner: Runner, name: string, args: any) {
     }
 
     const argvs = tool.toArgv(args);
-    const list: string[][] = Array.isArray(argvs[0]) ? (argvs as string[][]) : [argvs as string[]];
+    const list: string[][] = Array.isArray(argvs[0])
+        ? (argvs as string[][])
+        : [argvs as string[]];
 
     const results: RunResult[] = [];
     for (const argv of list) {
@@ -450,11 +560,12 @@ async function handle(runner: Runner, message: any) {
         switch (method) {
             case "initialize":
                 result = {
-                    protocolVersion: params?.protocolVersion ?? PROTOCOL_VERSION,
+                    protocolVersion:
+                        params?.protocolVersion ?? PROTOCOL_VERSION,
                     capabilities: { tools: { listChanged: false } },
                     serverInfo: { name: "eez-studio", version: getVersion() },
                     instructions:
-                        "EEZ Studio project designer. Typical loop: eez_new_project or eez_open -> eez_add_widget / eez_style / eez_set -> eez_render (look at the image) -> fix -> eez_check -> eez_build. Use eez_help and eez_schema to discover commands and properties; eez_run accepts any CLI command. Naming convention (enforced, snake_case): widgets <type>_<name> (label_title, img_icon_home, btn_save), pages <name>_page (main_page), everything else <name>; see eez_help naming."
+                        'EEZ Studio project designer. Before the first change in a session call eez_help with topic "guide" and follow it (design loop, apply batches, render checks, naming). Typical loop: eez_new_project or eez_open -> eez_add_widget / eez_style / eez_set -> eez_render (look at the image) -> fix -> eez_check -> eez_build. Use eez_help and eez_schema to discover commands and properties; eez_run accepts any CLI command. Naming convention (enforced, snake_case): widgets <type>_<name> (label_title, img_icon_home, btn_save), pages <name>_page (main_page), everything else <name>; see eez_help naming.'
                 };
                 break;
             case "ping":
@@ -470,7 +581,11 @@ async function handle(runner: Runner, message: any) {
                 };
                 break;
             case "tools/call":
-                result = await callTool(runner, params?.name, params?.arguments);
+                result = await callTool(
+                    runner,
+                    params?.name,
+                    params?.arguments
+                );
                 break;
             case "resources/list":
                 result = { resources: [] };
@@ -527,7 +642,11 @@ export async function runMcpServer(runner: Runner, args: string[]) {
                 try {
                     message = JSON.parse(text);
                 } catch (err) {
-                    send({ jsonrpc: "2.0", id: null, error: { code: -32700, message: "Parse error" } });
+                    send({
+                        jsonrpc: "2.0",
+                        id: null,
+                        error: { code: -32700, message: "Parse error" }
+                    });
                     return;
                 }
                 const messages = Array.isArray(message) ? message : [message];

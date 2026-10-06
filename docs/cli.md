@@ -18,8 +18,21 @@ node packages/cli/launcher/eez-cli.js help
 npm run cli -- help
 ```
 
-An installed EEZ Studio ships the launcher in its `resources/cli` folder
-(Node.js is needed to run it). It finds the executable next to it:
+The installers put an `eez-cli` command on the PATH. It runs the launcher with
+the application's own Electron, so Node.js is not needed:
+
+| installer | `eez-cli` |
+|---|---|
+| Windows (NSIS) | `<install folder>\resources\cli` added to the user PATH (`eez-cli.cmd`), removed on uninstall |
+| macOS `.pkg` | `/usr/local/bin/eez-cli` symlink |
+| macOS `.dmg` / `.zip` | menu **EEZ Studio > Install 'eez-cli' Command in PATH** creates the same symlink |
+| Linux `.deb` / `.rpm` | `/usr/bin/eez-cli` |
+| Linux AppImage | not installed, use the launcher below |
+
+Open a new terminal after installing, then `eez-cli help`.
+
+The launcher itself is in the `resources/cli` folder (`node eez-cli.js` needs
+Node.js). It finds the executable next to it:
 
 | OS | launcher |
 |---|---|
@@ -192,10 +205,12 @@ runtime or simulator.
 Register it with Claude Code:
 
 ```bash
+# installed EEZ Studio, eez-cli on the PATH (macOS, Linux)
+claude mcp add eez-studio -- eez-cli mcp
+# installed EEZ Studio, eez-cli on the PATH (Windows: .cmd needs cmd /c)
+claude mcp add eez-studio -- cmd /c eez-cli mcp
 # source checkout
 claude mcp add eez-studio -- node /path/to/eez-studio/packages/cli/launcher/eez-cli.js mcp
-# installed EEZ Studio (Windows)
-claude mcp add eez-studio -- node "C:/Users/<user>/AppData/Local/Programs/eezstudio/resources/cli/eez-cli.js" mcp
 ```
 
 or with a `.mcp.json` in the project folder:
@@ -227,9 +242,13 @@ selectors of created objects.
 
 ## Agent skill
 
-`packages/cli/skill/SKILL.md` describes the workflow for AI agents. For Claude
+`packages/cli/skill/SKILL.md` describes the workflow for AI agents. The MCP
+server serves it as `eez_help` topic `guide` (`eez-cli help guide`) and its
+instructions tell the agent to read it first, so nothing has to be copied.
+
+The installed app also ships it as `<resources>/cli/skill/SKILL.md`. For Claude
 Code, copy it to `.claude/skills/eez-studio/SKILL.md` in the repository where
-the `.eez-project` lives.
+the `.eez-project` lives to load it before any MCP call.
 
 ## Tests
 
