@@ -106,21 +106,38 @@ function flushAndExit(code: number) {
     process.stderr.write("", done);
 }
 
-// Ask a running EEZ Studio GUI instance to reload the project from disk.
-// A short-lived second instance delivers "--reload-project" through the
-// single instance lock; if no GUI is running it just quits.
-function reloadGui(filePath: string) {
-    const args = process.defaultApp ? [app.getAppPath()] : [];
-    args.push("--reload-project", filePath);
+function spawnGui(args: string[]) {
     const env = Object.assign({}, process.env);
+    // A GUI started from an MCP worker must not inherit its stdio bridge,
+    // temporary session or Electron-as-Node launcher mode.
+    delete env.ELECTRON_RUN_AS_NODE;
     delete env.EEZ_STUDIO_CLI_ARGS;
+    delete env.EEZ_STUDIO_CLI_STDIN;
+    delete env.EEZ_STUDIO_CLI_SESSION_DIR;
     const child = spawn(process.execPath, args, {
         detached: true,
         stdio: "ignore",
         windowsHide: true,
         env
     });
+    child.on("error", err => console.error("Failed to launch EEZ Studio GUI", err));
     child.unref();
+}
+
+export function launchGui(filePath?: string) {
+    const args = process.defaultApp ? [app.getAppPath()] : [];
+    if (filePath) {
+        args.push(filePath);
+    }
+    spawnGui(args);
+}
+
+// Ask a running GUI to reload from disk through the single instance lock.
+// If no GUI is running, this short-lived helper just quits.
+function reloadGui(filePath: string) {
+    const args = process.defaultApp ? [app.getAppPath()] : [];
+    args.push("--reload-project", filePath);
+    spawnGui(args);
 }
 
 export async function runCliMain(homeWindowUrl: string) {

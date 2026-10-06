@@ -8,7 +8,7 @@ import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
 const main = fs.readFileSync(new URL("../../../build/main/main.js", import.meta.url), "utf8");
 
-function startup(args, platform = "darwin") {
+function startup(args, platform = "darwin", events = new Map(), guiLaunches = []) {
     let dockVisible = true;
     const app = {
         setActivationPolicy(policy) {
@@ -16,7 +16,9 @@ function startup(args, platform = "darwin") {
             dockVisible = false;
         },
         commandLine: { appendSwitch() {} },
-        on() {}
+        isReady: () => true,
+        whenReady: async () => {},
+        on(name, listener) { events.set(name, listener); }
     };
     const modules = {
         "./fix-path": {},
@@ -29,7 +31,8 @@ function startup(args, platform = "darwin") {
         "main/cli-main": {
             isCliMode: () => args.includes("--cli"),
             redirectConsoleToStderr() {},
-            useTemporarySessionData() {}
+            useTemporarySessionData() {},
+            launchGui: file => guiLaunches.push(file)
         },
         "electron-context-menu": () => {}
     };
@@ -53,6 +56,25 @@ test("macOS background CLI instances stay out of the Dock before ready", () => {
     }
 });
 
+test("reopening a macOS MCP worker launches the GUI", async () => {
+    const events = new Map();
+    const launches = [];
+    startup(["--cli", "mcp"], "darwin", events, launches);
+    await events.get("activate")?.({}, false);
+    assert.deepEqual(launches, [undefined]);
+});
+
+test("opening a file through a macOS MCP worker forwards it to the GUI", async () => {
+    const events = new Map();
+    const launches = [];
+    startup(["--cli", "mcp"], "darwin", events, launches);
+    await events.get("will-finish-launching")();
+    let prevented = false;
+    await events.get("open-file")({ preventDefault() { prevented = true; } }, "/tmp/example.eez-project");
+    assert.equal(prevented, true);
+    assert.deepEqual(launches, ["/tmp/example.eez-project"]);
+});
+
 test("macOS reload helper stays out of the Dock before ready", () => {
     assert.equal(startup(["--reload-project", "/tmp/project.eez-project"]), false);
 });
@@ -65,5 +87,44 @@ test("Windows and Linux do not call the macOS activation API", () => {
     for (const platform of ["win32", "linux"]) {
         assert.equal(startup(["--cli", "mcp"], platform), true);
         assert.equal(startup(["--reload-project", "/tmp/project.eez-project"], platform), true);
+    }
+});
+
+test("GUI launch drops MCP arguments and environment, including for source builds", () => {
+    const cliMain = fs.readFileSync(
+        new URL("../../../build/main/cli-main.js", import.meta.url), "utf8"
+    );
+    for (const defaultApp of [false, true]) {
+        const launches = [];
+        const exports = {};
+        vm.runInNewContext(cliMain, {
+            exports,
+            require: name => {
+                if (name == "electron") return { app: { getAppPath: () => "/source" } };
+                if (name == "child_process") return {
+                    spawn: (...args) => {
+                        launches.push(args);
+                        return { on() {}, unref() {} };
+                    }
+                };
+                return require(name);
+            },
+            process: {
+                defaultApp, execPath: "/studio",
+                env: {
+                    PATH: "/usr/bin", ELECTRON_RUN_AS_NODE: "1",
+                    EEZ_STUDIO_CLI_ARGS: '["mcp"]',
+                    EEZ_STUDIO_CLI_STDIN: "127.0.0.1:1234",
+                    EEZ_STUDIO_CLI_SESSION_DIR: "/tmp/worker"
+                }
+            }
+        });
+        exports.launchGui("/project with spaces.eez-project");
+        const [command, args, options] = launches[0];
+        assert.equal(command, "/studio");
+        assert.deepEqual(Array.from(args), defaultApp
+            ? ["/source", "/project with spaces.eez-project"]
+            : ["/project with spaces.eez-project"]);
+        assert.deepEqual({ ...options.env }, { PATH: "/usr/bin" });
     }
 });

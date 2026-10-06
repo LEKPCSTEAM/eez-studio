@@ -17,6 +17,7 @@ import { setup } from "main/setup";
 import { HOME_WINDOW_URL } from "main/home-window";
 import {
     isCliMode,
+    launchGui,
     redirectConsoleToStderr,
     runCliMain,
     useTemporarySessionData
@@ -56,6 +57,21 @@ app.commandLine.appendSwitch("disable-renderer-backgrounding");
 // app.allowRendererProcessReuse = false;
 
 let homeWindow: BrowserWindow;
+
+// macOS can route Finder/Dock launches to an existing background MCP worker
+// because it has the same bundle ID. Start a GUI process in that case.
+app.on("activate", () => {
+    if (!app.isReady()) {
+        return;
+    }
+    if (cliMode) {
+        launchGui();
+    } else if (homeWindow) {
+        const { bringHomeWindowToFocus } =
+            require("main/home-window") as typeof HomeWindowModule;
+        bringHomeWindowToFocus();
+    }
+});
 
 app.on("ready", async function () {
     if (cliMode) {
@@ -156,6 +172,10 @@ app.on("quit", function () {
 app.on("will-finish-launching", async function () {
     app.on("open-file", async function (event, path) {
         event.preventDefault();
+        if (cliMode) {
+            launchGui(path);
+            return;
+        }
         const { openFile } = require("main/menu");
         openFile(path);
     });
