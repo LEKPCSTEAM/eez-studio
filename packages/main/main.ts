@@ -23,6 +23,16 @@ import {
 } from "main/cli-main";
 
 const cliMode = isCliMode();
+// Hidden BrowserWindows still give each Electron process a macOS Dock icon.
+// CLI/MCP workers and the short-lived reload helper are background apps;
+// set their activation policy before ready to avoid adding duplicate icons.
+if (
+    process.platform == "darwin" &&
+    (cliMode || process.argv.includes("--reload-project"))
+) {
+    app.setActivationPolicy("accessory");
+}
+
 if (cliMode) {
     redirectConsoleToStderr();
     useTemporarySessionData();
