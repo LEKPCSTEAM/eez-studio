@@ -120,7 +120,9 @@ function spawnGui(args: string[]) {
         windowsHide: true,
         env
     });
-    child.on("error", err => console.error("Failed to launch EEZ Studio GUI", err));
+    child.on("error", err =>
+        console.error("Failed to launch EEZ Studio GUI", err)
+    );
     child.unref();
 }
 
@@ -137,6 +139,12 @@ export function launchGui(filePath?: string) {
 function reloadGui(filePath: string) {
     const args = process.defaultApp ? [app.getAppPath()] : [];
     args.push("--reload-project", filePath);
+    spawnGui(args);
+}
+
+function refreshGui() {
+    const args = process.defaultApp ? [app.getAppPath()] : [];
+    args.push("--refresh-gui");
     spawnGui(args);
 }
 
@@ -188,7 +196,9 @@ export async function runCliMain(homeWindowUrl: string) {
             const [host, port] = bridge.split(":");
             const socket = net.connect(Number(port), host);
             socket.on("error", err => {
-                process.stderr.write(`eez-cli: stdin bridge error: ${err.message}\n`);
+                process.stderr.write(
+                    `eez-cli: stdin bridge error: ${err.message}\n`
+                );
                 if (!sender.isDestroyed()) {
                     sender.send("cli:stdin-end");
                 }
@@ -235,6 +245,14 @@ export async function runCliMain(homeWindowUrl: string) {
             reloadGui(filePath);
         } catch (err) {
             console.error("reload-gui failed", err);
+        }
+    });
+
+    ipcMain.on("cli:refresh-gui", () => {
+        try {
+            refreshGui();
+        } catch (err) {
+            console.error("refresh-gui failed", err);
         }
     });
 
@@ -300,7 +318,9 @@ function startDaemon(cliWindow: BrowserWindow, idleMinutes: number) {
 
     const removeStateFile = () => {
         try {
-            const state = JSON.parse(fs.readFileSync(DAEMON_STATE_FILE, "utf8"));
+            const state = JSON.parse(
+                fs.readFileSync(DAEMON_STATE_FILE, "utf8")
+            );
             if (state.pid == process.pid) {
                 fs.unlinkSync(DAEMON_STATE_FILE);
             }
@@ -377,20 +397,31 @@ function startDaemon(cliWindow: BrowserWindow, idleMinutes: number) {
             buffer = "";
 
             if (request.token !== token) {
-                reply(socket, { stderr: "eez-cli: invalid daemon token\n", exitCode: 1 });
+                reply(socket, {
+                    stderr: "eez-cli: invalid daemon token\n",
+                    exitCode: 1
+                });
                 return;
             }
 
             if (request.type == "ping") {
                 reply(socket, {
-                    stdout: JSON.stringify({ pid: process.pid, version: app.getVersion() }) + "\n",
+                    stdout:
+                        JSON.stringify({
+                            pid: process.pid,
+                            version: app.getVersion()
+                        }) + "\n",
                     exitCode: 0
                 });
                 return;
             }
 
             if (request.type == "stop") {
-                reply(socket, { stdout: "daemon stopped\n", exitCode: 0 }, stop);
+                reply(
+                    socket,
+                    { stdout: "daemon stopped\n", exitCode: 0 },
+                    stop
+                );
                 return;
             }
 
@@ -398,8 +429,11 @@ function startDaemon(cliWindow: BrowserWindow, idleMinutes: number) {
             const id = nextId++;
             pending.set(id, socket);
             cliWindow.webContents.send("cli:serve-request", id, {
-                args: Array.isArray(request.args) ? request.args.map(String) : [],
-                cwd: typeof request.cwd == "string" ? request.cwd : process.cwd()
+                args: Array.isArray(request.args)
+                    ? request.args.map(String)
+                    : [],
+                cwd:
+                    typeof request.cwd == "string" ? request.cwd : process.cwd()
             });
         });
     });

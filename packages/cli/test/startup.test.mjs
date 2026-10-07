@@ -79,6 +79,10 @@ test("macOS reload helper stays out of the Dock before ready", () => {
     assert.equal(startup(["--reload-project", "/tmp/project.eez-project"]), false);
 });
 
+test("macOS refresh helper stays out of the Dock before ready", () => {
+    assert.equal(startup(["--refresh-gui"]), false);
+});
+
 test("normal macOS GUI keeps its Dock icon", () => {
     assert.equal(startup([]), true);
 });
@@ -87,6 +91,7 @@ test("Windows and Linux do not call the macOS activation API", () => {
     for (const platform of ["win32", "linux"]) {
         assert.equal(startup(["--cli", "mcp"], platform), true);
         assert.equal(startup(["--reload-project", "/tmp/project.eez-project"], platform), true);
+        assert.equal(startup(["--refresh-gui"], platform), true);
     }
 });
 

@@ -94,6 +94,11 @@ Each changing command is saved immediately, after the previous file content is
 copied to `<file>.bak`. When EEZ Studio is running with the same project open,
 it reloads the project after each save.
 
+When the edits are done, `eez-cli refresh-gui` (MCP tool `eez_refresh_gui`)
+refreshes a running EEZ Studio exactly like **View > Reload** (Ctrl+R): the
+window reloads and reopens its tabs, so every edited project is read again from
+disk. Unsaved GUI changes are confirmed first. `reload-gui` is an alias.
+
 ## Commands
 
 `eez-cli help` lists all commands; `eez-cli help <command>` shows the options;
@@ -101,7 +106,7 @@ it reloads the project after each save.
 
 | group | commands |
 |---|---|
-| project | `project new`, `project types`, `info`, `project settings`, `project set`, `project features`, `project feature add`, `check`, `build`, `reload-gui` |
+| project | `project new`, `project types`, `info`, `project settings`, `project set`, `project features`, `project feature add`, `check`, `build`, `refresh-gui` |
 | pages | `page list/tree/add/rm/rename/set`, `user-widget list/add` |
 | widgets | `widget types/add/set/get/rm/move`, `widget event add/rm/list`, `widget style show/set/unset/clear` |
 | LVGL styles | `lvgl-style list/show/add/set/unset/rm/rename/apply/unapply/default/props/parts` |

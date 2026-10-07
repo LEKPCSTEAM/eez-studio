@@ -394,6 +394,13 @@ const TOOLS: Tool[] = [
         toArgv: () => ["build"]
     },
     {
+        name: "eez_refresh_gui",
+        description:
+            "Refresh a running EEZ Studio GUI, same as pressing Ctrl+R there: the window reloads and every open project is read again from disk. Call it after finishing a batch of edits so the user sees them.",
+        inputSchema: { type: "object", properties: {} },
+        toArgv: () => ["refresh-gui"]
+    },
+    {
         name: "eez_render",
         description:
             "Render a page to a PNG image and return it, so you can see the design. Also reports layout issues (overlaps, outside screen, overflow). Use bounds=true to draw widget boxes and names.",
@@ -565,7 +572,7 @@ async function handle(runner: Runner, message: any) {
                     capabilities: { tools: { listChanged: false } },
                     serverInfo: { name: "eez-studio", version: getVersion() },
                     instructions:
-                        'EEZ Studio project designer. Before the first change in a session call eez_help with topic "guide" and follow it (design loop, apply batches, render checks, naming). Typical loop: eez_new_project or eez_open -> eez_add_widget / eez_style / eez_set -> eez_render (look at the image) -> fix -> eez_check -> eez_build. Use eez_help and eez_schema to discover commands and properties; eez_run accepts any CLI command. Naming convention (enforced, snake_case): widgets <type>_<name> (label_title, img_icon_home, btn_save), pages <name>_page (main_page), everything else <name>; see eez_help naming.'
+                        'EEZ Studio project designer. Before the first change in a session call eez_help with topic "guide" and follow it (design loop, apply batches, render checks, naming). Typical loop: eez_new_project or eez_open -> eez_add_widget / eez_style / eez_set -> eez_render (look at the image) -> fix -> eez_check -> eez_build -> eez_refresh_gui (show the edits in a running GUI, like Ctrl+R). Use eez_help and eez_schema to discover commands and properties; eez_run accepts any CLI command. Naming convention (enforced, snake_case): widgets <type>_<name> (label_title, img_icon_home, btn_save), pages <name>_page (main_page), everything else <name>; see eez_help naming.'
                 };
                 break;
             case "ping":

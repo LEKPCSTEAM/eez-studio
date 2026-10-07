@@ -24,13 +24,13 @@ import {
 } from "main/cli-main";
 
 const cliMode = isCliMode();
+const guiHelperMode =
+    process.argv.includes("--reload-project") ||
+    process.argv.includes("--refresh-gui");
 // Hidden BrowserWindows still give each Electron process a macOS Dock icon.
 // CLI/MCP workers and the short-lived reload helper are background apps;
 // set their activation policy before ready to avoid adding duplicate icons.
-if (
-    process.platform == "darwin" &&
-    (cliMode || process.argv.includes("--reload-project"))
-) {
+if (process.platform == "darwin" && (cliMode || guiHelperMode)) {
     app.setActivationPolicy("accessory");
 }
 
@@ -94,7 +94,7 @@ app.on("ready", async function () {
             return;
         }
 
-        if (process.argv.includes("--reload-project")) {
+        if (guiHelperMode) {
             // no running instance to reload
             app.quit();
             return;
@@ -102,9 +102,18 @@ app.on("ready", async function () {
     }
 
     app.on("second-instance", function (event, commandLine, workingDirectory) {
+        if (commandLine.includes("--refresh-gui")) {
+            const { refreshHomeWindow } =
+                require("main/home-window") as typeof HomeWindowModule;
+            refreshHomeWindow();
+            return;
+        }
         const reloadProjectArgIndex = commandLine.indexOf("--reload-project");
         if (reloadProjectArgIndex != -1) {
-            console.log("[reload-project] second-instance triggered, commandLine:", commandLine);
+            console.log(
+                "[reload-project] second-instance triggered, commandLine:",
+                commandLine
+            );
             const { reloadProject } =
                 require("main/home-window") as typeof HomeWindowModule;
             console.log("[reload-project] calling reloadProject()");

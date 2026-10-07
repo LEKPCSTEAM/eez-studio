@@ -29,6 +29,14 @@ export function reloadProject(filePath?: string) {
     }
 }
 
+// Same as View > Reload (Ctrl+R): unsaved changes are confirmed first.
+export function refreshHomeWindow() {
+    let homeWindow = findWindowByParams(HOME_WINDOW_PARAMS);
+    if (homeWindow) {
+        homeWindow.browserWindow.webContents.send("reload");
+    }
+}
+
 export function importInstrumentDefinitionFile(filePath: string) {
     let homeWindow = findWindowByParams(HOME_WINDOW_PARAMS);
     if (homeWindow) {

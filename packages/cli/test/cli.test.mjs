@@ -420,7 +420,7 @@ test("MCP server: initialize, list tools, render returns an image", async () => 
 
         const tools = await rpc("tools/list", {});
         const names = tools.result.tools.map(tool => tool.name);
-        for (const name of ["eez_run", "eez_add_widget", "eez_style", "eez_render", "eez_check"]) {
+        for (const name of ["eez_run", "eez_add_widget", "eez_style", "eez_render", "eez_check", "eez_refresh_gui"]) {
             assert.ok(names.includes(name), name);
         }
 

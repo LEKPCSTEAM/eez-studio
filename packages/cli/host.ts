@@ -28,6 +28,10 @@ export function reloadGui(filePath: string) {
     ipcRenderer.send("cli:reload-gui", filePath);
 }
 
+export function refreshGui() {
+    ipcRenderer.send("cli:refresh-gui");
+}
+
 export async function capturePage(rect: {
     x: number;
     y: number;
@@ -86,10 +90,7 @@ export function readStdinAll(): Promise<string> {
     });
 }
 
-export function onStdinLine(
-    onLine: (line: string) => void,
-    onEnd: () => void
-) {
+export function onStdinLine(onLine: (line: string) => void, onEnd: () => void) {
     let buffer = "";
     addStdinListener({
         onData: chunk => {

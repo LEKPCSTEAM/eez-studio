@@ -8,6 +8,7 @@ import { Section } from "project-editor/store";
 import { CommandDef, getCommands, findCommandsWithPrefix } from "cli/registry";
 import { flattenMessages, formatProblem, Problem } from "cli/messages";
 import { CliError, EXIT_ERROR } from "cli/errors";
+import * as host from "cli/host";
 import { COLLECTIONS, allPageWidgets, selectorOf } from "cli/selectors";
 import { table } from "cli/format";
 import { CommandContext } from "cli/context";
@@ -302,15 +303,21 @@ function buildCommand(): CommandDef {
     };
 }
 
-function reloadGuiCommand(): CommandDef {
+function refreshGuiCommand(): CommandDef {
     return {
-        name: "reload-gui",
-        summary: "Ask a running EEZ Studio to reload this project from disk",
-        usage: "reload-gui",
+        name: "refresh-gui",
+        summary:
+            "Refresh a running EEZ Studio like Ctrl+R: open projects are reloaded from disk",
+        usage: `refresh-gui
+  Same as View > Reload (Ctrl+R) in the GUI: the window reloads and reopens
+  its tabs, so every edited project file is read again. Unsaved GUI changes
+  are confirmed first. Does nothing when EEZ Studio is not running.`,
+        project: "none",
         group: "project",
+        aliases: ["reload-gui"],
         run(ctx) {
-            ctx.session.notifyGui();
-            ctx.emit({ requested: ctx.session.filePath }, "reload requested");
+            host.refreshGui();
+            ctx.emit({ requested: true }, "GUI refresh requested");
         }
     };
 }
@@ -359,5 +366,5 @@ export const coreCommands: CommandDef[] = [
     checkCommand(),
     buildCommand(),
     openCommand(),
-    reloadGuiCommand()
+    refreshGuiCommand()
 ];

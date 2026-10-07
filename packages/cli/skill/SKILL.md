@@ -166,6 +166,9 @@ Examples: `obj add /lvglGroups/groups name=keys`, `obj set settings/build destin
 
 - Keep the GUI from overwriting your changes: the CLI asks a running EEZ Studio
   to reload the file after each save; unsaved GUI edits prompt the user.
+- When you finish editing, run `refresh-gui` (MCP: `eez_refresh_gui`). It does
+  the same as Ctrl+R in the GUI: the window reloads and reopens every project
+  from disk.
 - Renders show the editor view (like the page editor canvas), not a running app:
   expressions are not evaluated.
 - EEZ-GUI (firmware) widgets have no names; address them by `page:main_page/[i]`.
