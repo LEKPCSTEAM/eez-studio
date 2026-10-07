@@ -66,6 +66,7 @@ export class LVGLOffscreenPageRuntime extends LVGLPageRuntime {
         this.isMounted = true;
 
         await this.preloadImages();
+        await this.preloadFonts();
 
         runInAction(() => {
             this.page._lvglRuntime = this;
@@ -100,6 +101,23 @@ export class LVGLOffscreenPageRuntime extends LVGLPageRuntime {
         });
 
         this.pageObj = pageObj;
+    }
+
+    // getLvglBinFile() returns undefined until the background conversion ends
+    async preloadFonts() {
+        await Promise.all(
+            this.project.fonts
+                .filter(font => !font.lvglUseFreeType)
+                .map(async font => {
+                    const params = font._lvglExtractFontParams;
+                    if (
+                        !font._lvglFontDefinition ||
+                        font._lvglFontDefinitionExtractFontParams != params
+                    ) {
+                        await font.buildLvglFontDefinition(params);
+                    }
+                })
+        );
     }
 
     // run the LVGL main loop until the frame is stable

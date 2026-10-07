@@ -41,10 +41,15 @@ class RenderFlowContext implements IFlowContext {
     containerId = guid();
     document: IDocument;
     viewState: IViewState;
-    editorOptions: IEditorOptions = { disableUpdateComponentGeometry: true } as any;
+    editorOptions: IEditorOptions = {
+        disableUpdateComponentGeometry: true
+    } as any;
     _dataContext: IDataContext | undefined;
 
-    constructor(public flow: Flow, public transform: Transform) {
+    constructor(
+        public flow: Flow,
+        public transform: Transform
+    ) {
         this.document = new RenderDocument(new TreeObjectAdapter(flow), this);
         this.viewState = new RenderViewState(this) as any;
         makeObservable(this, { flowState: computed });
@@ -70,9 +75,15 @@ class RenderFlowContext implements IFlowContext {
         if (!dataContextOverridesObject) {
             return this;
         }
-        return Object.assign(new RenderFlowContext(this.flow, this.transform), this, {
-            _dataContext: this.dataContext.createWithDefaultValueOverrides(dataContextOverridesObject)
-        });
+        return Object.assign(
+            new RenderFlowContext(this.flow, this.transform),
+            this,
+            {
+                _dataContext: this.dataContext.createWithDefaultValueOverrides(
+                    dataContextOverridesObject
+                )
+            }
+        );
     }
 
     overrideFlowState(component: Component): IFlowContext {
@@ -81,7 +92,10 @@ class RenderFlowContext implements IFlowContext {
 }
 
 class RenderDocument {
-    constructor(public flow: TreeObjectAdapter, public flowContext: RenderFlowContext) {}
+    constructor(
+        public flow: TreeObjectAdapter,
+        public flowContext: RenderFlowContext
+    ) {}
     get connectionLines() {
         return [];
     }
@@ -171,7 +185,9 @@ class RenderViewState {
 ////////////////////////////////////////////////////////////////////////////////
 
 function nextFrame() {
-    return new Promise(resolve => requestAnimationFrame(() => resolve(undefined)));
+    return new Promise(resolve =>
+        requestAnimationFrame(() => resolve(undefined))
+    );
 }
 
 function sleep(ms: number) {
@@ -179,7 +195,9 @@ function sleep(ms: number) {
 }
 
 async function pngToFrame(png: Uint8Array) {
-    const bitmap = await createImageBitmap(new Blob([png as any], { type: "image/png" }));
+    const bitmap = await createImageBitmap(
+        new Blob([png as any], { type: "image/png" })
+    );
     const canvas = document.createElement("canvas");
     canvas.width = bitmap.width;
     canvas.height = bitmap.height;
@@ -195,10 +213,15 @@ export async function renderDomPage(
     options: { output?: string; scale?: number; bounds?: boolean }
 ) {
     const store = ctx.store;
-    const width = page.width || store.project.settings.general.displayWidth || 480;
-    const height = page.height || store.project.settings.general.displayHeight || 272;
+    const width =
+        page.width || store.project.settings.general.displayWidth || 480;
+    const height =
+        page.height || store.project.settings.general.displayHeight || 272;
 
-    await host.setWindowSize(Math.max(width + 20, 800), Math.max(height + 20, 600));
+    await host.setWindowSize(
+        Math.max(width + 20, 800),
+        Math.max(height + 20, 600)
+    );
 
     const container = document.createElement("div");
     container.style.cssText = `position: fixed; left: 0; top: 0; width: ${width}px; height: ${height}px; overflow: hidden; background: ${
@@ -221,7 +244,8 @@ export async function renderDomPage(
                 React.createElement(
                     "div",
                     {
-                        className: "EezStudio_FlowCanvasContainer EezStudio_PageEditor",
+                        className:
+                            "EezStudio_FlowCanvasContainer EezStudio_PageEditor",
                         style: { position: "relative", width, height }
                     },
                     page.render(flowContext, width, height)
@@ -234,6 +258,7 @@ export async function renderDomPage(
             await nextFrame();
         }
         await sleep(300);
+        await document.fonts.ready;
         await nextFrame();
 
         const png = await host.capturePage({ x: 0, y: 0, width, height });
@@ -245,7 +270,9 @@ export async function renderDomPage(
         const containerRect = container.getBoundingClientRect();
         const layout: any[] = [];
         const boxes: OverlayBox[] = [];
-        const elements = container.querySelectorAll("[data-eez-flow-object-id]");
+        const elements = container.querySelectorAll(
+            "[data-eez-flow-object-id]"
+        );
         elements.forEach(el => {
             const id = el.getAttribute("data-eez-flow-object-id")!;
             const object = store.getObjectFromObjectId(id) as any;
@@ -258,11 +285,16 @@ export async function renderDomPage(
             const w = Math.round(rect.width);
             const h = Math.round(rect.height);
             let depth = 0;
-            for (let p = el.parentElement; p && p != container; p = p.parentElement) {
+            for (
+                let p = el.parentElement;
+                p && p != container;
+                p = p.parentElement
+            ) {
                 if (p.hasAttribute("data-eez-flow-object-id")) depth++;
             }
             const issues: string[] = [];
-            if (x < 0 || y < 0 || x + w > width || y + h > height) issues.push("outside-screen");
+            if (x < 0 || y < 0 || x + w > width || y + h > height)
+                issues.push("outside-screen");
             if (w <= 0 || h <= 0) issues.push("zero-size");
             layout.push({
                 selector: selectorOf(object),
@@ -280,7 +312,9 @@ export async function renderDomPage(
                 width: w,
                 height: h,
                 depth,
-                label: nameOf(object) ?? classNameOf(object).replace(/Widget$/, ""),
+                label:
+                    nameOf(object) ??
+                    classNameOf(object).replace(/Widget$/, ""),
                 issue: issues.length > 0
             });
         });
@@ -309,6 +343,5 @@ export async function renderDomPage(
     } finally {
         root.unmount();
         container.remove();
-
     }
 }
